@@ -87,7 +87,7 @@ export async function loadDiscover({ lat, lng, radius, category }) {
     if (category) q = q.eq('category', category);
     rows = (need(await q) || []).filter((l) => l.qty_reserved < l.quantity);
     const names = await orgMap(rows.map((l) => l.donor_org_id));
-    rows = rows.map((l) => ({ ...l, donor_name: (names[l.donor_org_id] || {}).name || 'Donor', distance: null }));
+    rows = rows.map((l) => ({ ...l, donor_name: (names[l.donor_org_id] || {}).name || 'Donor', donor_address: (names[l.donor_org_id] || {}).address || null, distance: null }));
   }
   return rows.map((l) => ({ ...l, photo: publicUrl('listing-photos', l.photo_path) }));
 }

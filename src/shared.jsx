@@ -124,7 +124,7 @@ export function ImpactView({ org, kind, stats }) {
   const cur = { donations: stats.donations, units: stats.units, partners: stats.partners };
   const label = (d) => d.metric === 'donations' ? `${d.threshold} ${kind === 'donor' ? 'donation' : 'pickup'}${d.threshold > 1 ? 's' : ''}` : d.metric === 'units' ? `${d.threshold} units ${verb}` : `${d.threshold} ${kind === 'donor' ? 'NGOs' : 'donors'}`;
   return (<>
-    <PageHead title="Impact" sub="Calculated only from your confirmed pickups." />
+    <PageHead kicker="Recognition" title="Impact" sub="Calculated only from your confirmed pickups." />
     <div className="grid">
       <Stat i={0} n={stats.donations} label={kind === 'donor' ? 'Donations completed' : 'Pickups completed'} icon={<FiCheckCircle />} />
       <Stat i={1} n={stats.units} label={`Units ${verb}`} icon={<FiAward />} />

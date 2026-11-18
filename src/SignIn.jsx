@@ -3,44 +3,32 @@ import { FiEye, FiEyeOff, FiArrowLeft, FiCheck } from 'react-icons/fi';
 import { db, ROUTES, SIGNIN, EMAIL_RE, errMsg } from './lib.js';
 import { loadMe, need } from './data.js';
 import { ThemeToggle } from './shell.jsx';
+import { Logo } from './brand.jsx';
 import { Btn, AsyncForm, Field, useToast } from './ui.jsx';
 
 const SLIDES = [
-  ['Turn surplus food into hope.', 'Restaurants, hotels and canteens share what they can’t serve, safely and in minutes.'],
+  ['Good food deserves a second journey.', 'Restaurants, hotels and canteens share what they can’t serve, safely and in minutes.'],
   ['Find food close to your community.', 'NGOs discover fresh listings nearby and collect with their own representatives.'],
-  ['A bridge between a meal and a mouth.', 'Verified organisations, OTP-confirmed pickups, and transparent impact.'],
+  ['A bridge between a meal and a mouth.', 'Verified organisations, code-confirmed pickups and transparent impact.'],
 ];
 
 function Art() {
   const [i, setI] = useState(0);
-  useEffect(() => { const t = setInterval(() => setI((x) => (x + 1) % SLIDES.length), 5200); return () => clearInterval(t); }, []);
-  const sparks = useRef(Array.from({ length: 16 }, (_, k) => ({ k, z: 3 + Math.random() * 6, l: Math.random() * 100, d: 9 + Math.random() * 10, o: -Math.random() * 14 }))).current;
+  useEffect(() => { const t = setInterval(() => setI((x) => (x + 1) % SLIDES.length), 5600); return () => clearInterval(t); }, []);
   return (
-    <section className="art" aria-label="AnnSetu illustration">
-      <div className="brand"><i className="dot" />AnnSetu</div>
-      {sparks.map((s) => <span key={s.k} className="spark" style={{ width: s.z, height: s.z, left: s.l + '%', animationDuration: s.d + 's', animationDelay: s.o + 's' }} />)}
-      <svg className="scene" viewBox="0 0 600 560" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
-        <circle className="sunring" cx="490" cy="110" r="46" />
-        <circle className="sun" cx="490" cy="110" r="42" />
-        <g className="cloud"><ellipse cx="120" cy="90" rx="46" ry="15" /><ellipse cx="150" cy="78" rx="30" ry="14" /></g>
-        <g className="cloud b"><ellipse cx="60" cy="170" rx="38" ry="12" /><ellipse cx="84" cy="160" rx="24" ry="11" /></g>
-        <path className="hill1" d="M0 430 Q150 360 300 410 T600 390 V560 H0Z" />
-        <path className="hill2" d="M0 470 Q180 420 320 460 T600 440 V560 H0Z" />
-        <g><rect className="bld" x="50" y="330" width="120" height="110" rx="6" /><path className="roof a" d="M40 335 L110 285 L180 335Z" />
-          <rect className="win" x="70" y="360" width="26" height="34" rx="3" /><rect className="win" x="118" y="360" width="26" height="34" rx="3" /><rect className="door" x="92" y="400" width="34" height="40" rx="3" /></g>
-        <g><rect className="bld" x="430" y="340" width="120" height="100" rx="6" /><path className="roof b" d="M420 345 L490 295 L560 345Z" />
-          <rect className="win" x="472" y="385" width="36" height="55" rx="3" /><path className="hrt" d="M490 372c-8-9-20 0-10 8l10 8 10-8c10-8-2-17-10-8z" /></g>
-        <g>{[0, 1.5, 3].map((d, n) => <path key={n} className="heart" d="M490 330c-5-6-13 0-6 5l6 5 6-5c7-5-1-11-6-5z" style={{ animationDelay: d + 's', transform: `translateX(${(n - 1) * 16}px)` }} />)}</g>
-        <path className="bridge" d="M175 425 Q300 280 425 425" />
-        <path className="path" d="M175 425 Q300 280 425 425" />
-        <g className="posts"><path d="M215 396V425M255 357V425M300 350V425M345 357V425M385 396V425" /></g>
-        <g><g><ellipse rx="15" ry="8" className="f1" /><path d="M-15 0a15 15 0 0030 0z" className="f2" /><path className="steam" d="M-5-6q-3-6 0-10M5-6q-3-6 0-10" /><animateMotion dur="7s" repeatCount="indefinite" path="M175 395 Q300 250 425 395" /></g>
-          <g><rect x="-14" y="-8" width="28" height="16" rx="8" className="f3" /><path d="M-6-8v16M3-8v16" className="f4" /><animateMotion dur="7s" begin="-2.3s" repeatCount="indefinite" path="M175 395 Q300 250 425 395" /></g>
-          <g><circle r="10" className="f2" /><path d="M0-10q6-8 12-4q-6 6-12 4z" className="f5" /><animateMotion dur="7s" begin="-4.6s" repeatCount="indefinite" path="M175 395 Q300 250 425 395" /></g></g>
-        <g className="bob"><text x="300" y="256" textAnchor="middle" className="sceneword">Ann Setu</text></g>
+    <section className="art" aria-label="About AnnSetu" data-dark>
+      <Logo tone="reverse" />
+      <div className="cap" aria-live="polite">{SLIDES.map((s, k) => <div key={k} className={k === i ? 'on' : ''} aria-hidden={k !== i}><h2>{s[0]}</h2><p>{s[1]}</p></div>)}</div>
+      <svg className="scene" viewBox="0 0 520 220" aria-hidden="true">
+        <path className="sc-arch" d="M30 190 Q260 -20 490 190" pathLength="1" />
+        <path className="sc-deck" d="M0 150 H520" />
+        {[90, 140, 190, 240, 290, 340, 390, 440].map((x) => { const t = (x - 30) / 460; return <path key={x} className="sc-h" d={`M${x} ${(190 - 420 * t * (1 - t)).toFixed(1)} V150`} />; })}
+        <circle className="sc-n a" cx="30" cy="150" r="7" /><circle className="sc-n b" cx="490" cy="150" r="7" />
+        <circle className="sc-m" r="5"><animateMotion dur="6s" repeatCount="indefinite" path="M30 150 H490" /></circle>
+        <text x="30" y="182" className="sc-t">donor</text><text x="490" y="182" textAnchor="end" className="sc-t">community</text>
       </svg>
-      <div className="cap">{SLIDES.map((s, k) => <div key={k} className={k === i ? 'on' : ''}><h2>{s[0]}</h2><p>{s[1]}</p></div>)}</div>
-      <div className="dots">{SLIDES.map((_, k) => <i key={k} className={k === i ? 'on' : ''} />)}</div>
+      <p className="art-note">verified · code-confirmed · real impact</p>
+      <div className="dots" aria-hidden="true">{SLIDES.map((_, k) => <i key={k} className={k === i ? 'on' : ''} />)}</div>
     </section>
   );
 }
@@ -154,7 +142,7 @@ export default function SignIn() {
     <div className="auth">
       <Art />
       <section className="panel">
-        <div className="authbar"><ThemeToggle /></div>
+        <div className="authbar"><a className="lk back" href="index.html"><FiArrowLeft /> AnnSetu home</a><ThemeToggle /></div>
         <div className="wrap">
           {checking ? <div className="boot-dots"><i /><i /><i /></div> : view === 'done' ? (
             <div className="done rise">
@@ -163,7 +151,7 @@ export default function SignIn() {
               <p className="fine"><button className="lk" onClick={() => setView('login')}><FiArrowLeft /> Back to sign in</button></p>
             </div>
           ) : (<>
-            <h1 key={view} className="rise">{t[0]}</h1><p className="sub rise" style={{ '--i': 1 }}>{t[1]}</p>
+            <span className="kick rise">{view === 'register' ? 'New account' : view === 'login' ? 'Sign in' : 'Account recovery'}</span><h1 key={view} className="rise">{t[0]}</h1><p className="sub rise" style={{ '--i': 1 }}>{t[1]}</p>
             {(view === 'login' || view === 'register') && (
               <div className={'tabs' + (view === 'register' ? ' reg' : '')} role="tablist"><i />
                 <button role="tab" aria-selected={view === 'login'} className={view === 'login' ? 'on' : ''} onClick={() => setView('login')}>Sign in</button>
@@ -176,7 +164,7 @@ export default function SignIn() {
                   <Field label="Email" wide><input name="email" type="email" autoComplete="email" placeholder="you@organisation.org" /></Field>
                   <Field label="Password" wide><PassWrap name="password" autoComplete="current-password" placeholder="Your password" /></Field>
                   <div className="row wide"><label className="ck2"><input type="checkbox" defaultChecked /> Keep me signed in</label><button type="button" className="lk" onClick={() => setView('forgot')}>Forgot password?</button></div>
-                  <div className="wide"><Btn type="submit" busy={busy} className="full">Sign in</Btn></div>
+                  <div className="wide"><Btn type="submit" busy={busy} className="full" arrow>Sign in</Btn></div>
                   <div className="or wide">or</div>
                   <div className="wide"><Btn kind="ghost" className="full" onClick={google}>{GOOGLE} Continue with Google</Btn></div>
                 </>)}
@@ -187,14 +175,14 @@ export default function SignIn() {
                 {({ busy }) => (<>
                   <div className="wide"><span className="lab">I am joining as</span>
                     <div className="roles">
-                      <button type="button" className={"rolebtn" + (role === "donor" ? " on" : "")} onClick={() => setRole('donor')} aria-pressed={role === 'donor'}><b>Donor</b><span>Restaurant, hotel, canteen, event</span></button>
-                      <button type="button" className={"rolebtn" + (role === "ngo" ? " on" : "")} onClick={() => setRole('ngo')} aria-pressed={role === 'ngo'}><b>Receiver</b><span>NGO, shelter, community kitchen</span></button>
+                      <button type="button" className={"rolebtn" + (role === "donor" ? " on" : "")} onClick={() => setRole('donor')} aria-pressed={role === 'donor'}><i>01</i><b>Donor</b><span>Restaurant, hotel, canteen, event</span></button>
+                      <button type="button" className={"rolebtn" + (role === "ngo" ? " on" : "")} onClick={() => setRole('ngo')} aria-pressed={role === 'ngo'}><i>02</i><b>Receiver</b><span>NGO, shelter, community kitchen</span></button>
                     </div></div>
                   <Field label="Full name" wide><input name="name" autoComplete="name" placeholder="Your name" /></Field>
                   <Field label="Email" wide><input name="email" type="email" autoComplete="email" placeholder="you@organisation.org" /></Field>
                   <div className="wide"><PassField label="Password" name="password" autoComplete="new-password" placeholder="At least 8 characters" meter value={pw} onChange={(e) => setPw(e.target.value)} /></div>
                   <label className="ck2 wide"><input type="checkbox" name="tc" /> <span>I agree to the Terms and Privacy Policy</span></label>
-                  <div className="wide"><Btn type="submit" busy={busy} className="full">Create account</Btn></div>
+                  <div className="wide"><Btn type="submit" busy={busy} className="full" arrow>Create account</Btn></div>
                   <div className="note wide">Organisations are reviewed by an admin before they can list or request food.</div>
                   <div className="or wide">or</div>
                   <div className="wide"><Btn kind="ghost" className="full" onClick={google}>{GOOGLE} Sign up with Google</Btn></div>
@@ -220,7 +208,7 @@ export default function SignIn() {
             )}
           </>)}
         </div>
-        <p className="fine taglinep">Save Food. Share Hope. Build Change.</p>
+        <p className="fine taglinep">Good food deserves a second journey.</p>
       </section>
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { FiX, FiCheckCircle, FiAlertCircle, FiInfo } from 'react-icons/fi';
+import { createPortal } from 'react-dom';
+import { FiX, FiCheckCircle, FiAlertCircle, FiInfo, FiArrowUpRight } from 'react-icons/fi';
 import { errMsg } from './lib.js';
 
 /* ---------------- toasts ---------------- */
@@ -15,7 +16,7 @@ export function ToastProvider({ children }) {
   return (
     <ToastCtx.Provider value={toast}>
       {children}
-      <div className="toasts" role="status" aria-live="polite">
+      <div className="toasts" role="status" aria-live="polite" data-dark>
         {list.map((t) => (
           <div key={t.id} className={'toast ' + t.kind}>
             {t.kind === 'bad' ? <FiAlertCircle /> : t.kind === 'info' ? <FiInfo /> : <FiCheckCircle />}
@@ -28,7 +29,12 @@ export function ToastProvider({ children }) {
 }
 
 /* ---------------- buttons & forms ---------------- */
-export function Btn({ kind = 'primary', size, busy, onClick, children, type = 'button', disabled, className = '', ...p }) {
+/* Directional arrow: slides out and back in on hover (CSS). */
+export const Arrow = () => (
+  <span className="arw" aria-hidden="true"><FiArrowUpRight className="a1" /><FiArrowUpRight className="a2" /></span>
+);
+
+export function Btn({ kind = 'primary', size, busy, onClick, children, type = 'button', disabled, className = '', arrow, ...p }) {
   const toast = useToast();
   const [b, setB] = useState(false);
   const mounted = useRef(true);
@@ -43,9 +49,10 @@ export function Btn({ kind = 'primary', size, busy, onClick, children, type = 'b
   };
   const isBusy = busy || b;
   return (
-    <button type={type} className={`btn ${kind} ${size || ''} ${className}`} disabled={disabled || isBusy} onClick={click} {...p}>
+    <button type={type} className={`btn ${kind} ${size || ''} ${arrow ? 'has-arrow' : ''} ${className}`} disabled={disabled || isBusy} onClick={click} aria-busy={isBusy || undefined} {...p}>
       {isBusy ? <span className="spin" aria-hidden="true" /> : null}
       <span>{children}</span>
+      {arrow ? <Arrow /> : null}
     </button>
   );
 }
@@ -87,12 +94,20 @@ export const Card = ({ children, className = '', i = 0, ...p }) => (
   <div className={'card rise ' + className} style={{ '--i': i }} {...p}>{children}</div>
 );
 export const Tag = ({ s, children }) => <span className={'tag ' + (s || '')}>{children ?? s}</span>;
-export const Empty = ({ children, icon }) => <div className="empty rise">{icon}<div>{children}</div></div>;
+export const Empty = ({ children, icon, title, action }) => (
+  <div className="empty rise">
+    <svg className="empty-mark" viewBox="0 0 100 40" aria-hidden="true"><path d="M4 34 Q50 -6 96 34" pathLength="1" /><circle cx="4" cy="34" r="3" /><circle cx="96" cy="34" r="3" /></svg>
+    {icon}
+    <div>{title ? <b className="empty-t">{title}</b> : null}<div>{children}</div></div>
+    {action || null}
+  </div>
+);
 export const Bar = ({ pct }) => <div className="bar"><i style={{ width: Math.max(0, Math.min(100, pct)) + '%' }} /></div>;
 
 export function useCountUp(n, ms = 900) {
   const [v, setV] = useState(0);
   useEffect(() => {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setV(n); return undefined; }
     let raf, t0;
     const step = (t) => {
       t0 = t0 || t;
@@ -143,24 +158,40 @@ export function Skeleton() {
 }
 
 export function Modal({ title, onClose, children, wide }) {
+  const box = useRef(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
-    const k = (e) => e.key === 'Escape' && onClose();
+    const prev = document.activeElement;
+    const k = (e) => {
+      if (e.key === 'Escape') closeRef.current();
+      if (e.key === 'Tab' && box.current) { // keep keyboard focus inside the dialog
+        const f = box.current.querySelectorAll('a[href],button:not(:disabled),input:not(:disabled),select,textarea,[tabindex]:not([tabindex="-1"])');
+        if (!f.length) return;
+        const first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
     document.addEventListener('keydown', k);
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', k); document.body.style.overflow = ''; };
-  }, [onClose]);
-  return (
+    const t = setTimeout(() => { const el = box.current && box.current.querySelector('input,textarea,select,button:not(.mclose)'); (el || box.current)?.focus(); }, 30);
+    return () => { clearTimeout(t); document.removeEventListener('keydown', k); document.body.style.overflow = ''; if (prev && prev.focus) prev.focus(); };
+  }, []);
+  return createPortal(
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={'modal' + (wide ? ' wide' : '')} role="dialog" aria-modal="true" aria-label={title}>
-        <div className="mh"><h3>{title}</h3><button className="ib sm" aria-label="Close" onClick={onClose}><FiX /></button></div>
+      <div ref={box} tabIndex={-1} className={'modal' + (wide ? ' wide' : '')} role="dialog" aria-modal="true" aria-label={title}>
+        <div className="mh"><h3>{title}</h3><button className="ib sm mclose" aria-label="Close" onClick={onClose}><FiX /></button></div>
         <div className="mb">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
 export function confetti() {
-  const colors = ['#B89552', '#D4B26A', '#183A32', '#718879', '#A7654E', '#FFB020', '#34C48C'];
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors = ['#FFE28A', '#F5D98B', '#287FA6', '#82C5DF', '#164B70', '#E87968', '#A8D9E9'];
   const box = document.createElement('div');
   box.className = 'confetti';
   for (let i = 0; i < 46; i++) {

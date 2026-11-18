@@ -4,6 +4,7 @@ import { db, CATEGORIES, toLocalInput, fmtDT, tleft } from './lib.js';
 import { need, loadReceiver, loadDiscover, subscribe, markAllRead } from './data.js';
 import { Shell, PageHead, Hero } from './shell.jsx';
 import { Btn, AsyncForm, Field, Card, Tag, Empty, Bar, Stat, Skeleton, useToast, useLoader, useHashTab } from './ui.jsx';
+import { DiscoverBoard } from './discover.jsx';
 import { VerifyBanner, canAct, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity } from './shared.jsx';
 
 const TABS = ['overview', 'discover', 'requests', 'pickups', 'needs', 'impact', 'profile'];
@@ -65,7 +66,7 @@ export default function Receiver({ me }) {
   </>);
 
   const requestsView = (<>
-    <PageHead title="Requests" sub="Track every request you have sent." />
+    <PageHead kicker="Outgoing" title="Requests" sub="Track every request you have sent." />
     {!requests.length ? <Empty>You haven’t sent any requests yet. Browse Discover to find food.</Empty> : requests.map((r, i) => (
       <Card key={r.id} i={i}>
         <div className="row"><div><h3>{r.listing?.title || 'Listing'}</h3><span className="m">{r.donor?.name || 'Donor'} · {r.quantity} requested · rep: {r.rep_name || '—'}</span></div><Tag s={r.status} /></div>
@@ -79,7 +80,7 @@ export default function Receiver({ me }) {
   </>);
 
   const pickupsView = (<>
-    <PageHead title="Pickups" sub="Your representative collects the food and shows the OTP to the donor." />
+    <PageHead kicker="Handover" title="Pickups" sub="Your representative collects the food and shows the OTP to the donor." />
     {!accepted.length ? <Empty>No accepted pickups waiting.</Empty> : accepted.map((r, i) => (
       <Card key={r.id} i={i}>
         <div className="row"><div><h3>{r.listing?.title}</h3><span className="m">{r.donor?.name} · {r.donor?.address || 'address on request'} · collect {r.quantity} · rep: {r.rep_name}</span></div><Tag s="accepted" /></div>
@@ -101,7 +102,7 @@ export default function Receiver({ me }) {
     await refresh();
   };
   const needsView = (<>
-    <PageHead title="Needs" sub="Tell donors what your community needs." />
+    <PageHead kicker="Community" title="Needs" sub="Tell donors what your community needs." />
     <Card>
       <h3>Publish a requirement</h3>
       <AsyncForm onSubmit={addNeed} className="mt">
@@ -159,7 +160,7 @@ export default function Receiver({ me }) {
         {view === 'pickups' && pickupsView}
         {view === 'needs' && needsView}
         {view === 'impact' && org && <ImpactView org={org} kind="ngo" stats={stats} />}
-        {view === 'profile' && <><PageHead title="Profile" sub="Your organisation, representatives and documents." /><ProfileView role="ngo" user={me.user} org={org} docs={docs} onChanged={async () => { if (!org) setTab('profile'); await refresh(); }} extra={org ? repsCard : null} /></>}
+        {view === 'profile' && <><PageHead kicker="Organisation" title="Profile" sub="Your organisation, representatives and documents." /><ProfileView role="ngo" user={me.user} org={org} docs={docs} onChanged={async () => { if (!org) setTab('profile'); await refresh(); }} extra={org ? repsCard : null} /></>}
       </>}
       {chat && <ChatModal request={chat} meId={uid} title={`Chat with ${chat.donor?.name || 'donor'}`} onClose={() => setChat(null)} />}
       {report && <ReportModal reporterOrg={org.id} reportedOrg={report.listing.donor_org_id} requestId={report.id} reportedName={report.donor?.name} onClose={() => setReport(null)} />}
@@ -167,65 +168,31 @@ export default function Receiver({ me }) {
   );
 }
 
-/* ---------- discover (nearby search) ---------- */
+/* ---------- discover (nearby search + drag-to-request board) ---------- */
 function Discover({ org, reps, ok, onRequested, setTab }) {
   const toast = useToast();
   const [pos, setPos] = useState(org && org.lat != null && org.lng != null ? { lat: Number(org.lat), lng: Number(org.lng) } : null);
   const [radius, setRadius] = useState(15);
-  const [cat, setCat] = useState('');
-  const { data, error, refresh } = useLoader(() => loadDiscover({ lat: pos?.lat, lng: pos?.lng, radius, category: cat }), [pos?.lat, pos?.lng, radius, cat]);
+  const { data, error, refresh } = useLoader(() => loadDiscover({ lat: pos?.lat, lng: pos?.lng, radius, category: '' }), [pos?.lat, pos?.lng, radius]);
   const locate = () => new Promise((res) => {
     if (!navigator.geolocation) { toast('Your browser can’t share location.', 'bad'); return res(); }
     navigator.geolocation.getCurrentPosition((p) => { setPos({ lat: p.coords.latitude, lng: p.coords.longitude }); res(); },
       () => { toast('Couldn’t read your location. Allow location access and try again.', 'bad'); res(); }, { timeout: 12000 });
   });
-  return (<>
-    <PageHead title="Discover food" sub={pos ? `Fresh listings within ${radius} km, nearest first.` : 'Fresh listings from verified donors. Share your location to sort by distance.'} />
-    <div className="fl">
-      <button className={'chip' + (cat === '' ? ' on' : '')} onClick={() => setCat('')}>All</button>
-      {CATEGORIES.map((c) => <button key={c} className={'chip' + (cat === c ? ' on' : '')} onClick={() => setCat(c)}>{c}</button>)}
-    </div>
-    <div className="fl">
-      <Btn size="sm" kind="ghost" onClick={locate}><FiNavigation /> {pos ? 'Update my location' : 'Use my location'}</Btn>
+  const controls = (
+    <div className="geo-f">
+      <Btn size="sm" kind="ghost" onClick={locate}><FiNavigation /> {pos ? 'Update location' : 'Use my location'}</Btn>
       {pos && <select className="mini" value={radius} onChange={(e) => setRadius(+e.target.value)} aria-label="Search radius">{[5, 15, 30, 50].map((r) => <option key={r} value={r}>{r} km</option>)}</select>}
       {pos && <Btn size="sm" kind="ghost" onClick={() => setPos(null)}>Clear location</Btn>}
     </div>
-    {!reps.length && ok && <div className="banner warn rise"><FiUsers /><div><b>Add a pickup representative first</b><span>You choose who collects each pickup.</span></div><Btn size="sm" kind="ghost" onClick={() => setTab('profile')}>Add</Btn></div>}
-    {error ? <Empty>Couldn’t load listings: {error.message}</Empty> : !data ? <Skeleton /> : !data.length ? <Empty>No available food right now{pos ? ' within this distance' : ''}. Check back soon.</Empty> :
-      data.map((l, i) => <ListingCard key={l.id} l={l} i={i} reps={reps} ok={ok} onDone={async () => { await onRequested(); await refresh(); }} />)}
-  </>);
-}
-
-function ListingCard({ l, i, reps, ok, onDone }) {
-  const toast = useToast();
-  const left = l.quantity - l.qty_reserved;
-  const [qty, setQty] = useState(Math.min(left, 10));
-  const [rep, setRep] = useState(reps[0]?.id || '');
-  useEffect(() => { if (!rep && reps[0]) setRep(reps[0].id); }, [reps]); // eslint-disable-line
-  const request = async () => {
-    if (!ok) throw new Error('Your organisation must be verified before requesting food.');
-    if (!rep) throw new Error('Add a pickup representative first.');
-    const q = Math.floor(+qty);
-    if (!(q >= 1) || q > left) throw new Error(`Choose a quantity between 1 and ${left}.`);
-    need(await db.rpc('create_request', { p_listing: l.id, p_qty: q, p_rep: rep }));
-    toast('Request sent to the donor.');
-    await onDone();
-  };
-  return (
-    <Card i={i} className="lcard">
-      {l.photo ? <img className="lph" src={l.photo} alt="" loading="lazy" /> : null}
-      <div className="lbody">
-        <div className="row"><div><h3>{l.title}</h3><span className="m">{l.donor_name} · {l.category}{l.distance != null ? ` · ${Number(l.distance).toFixed(1)} km away` : ''}</span></div><Tag s="t">{tleft(l.pickup_by)}</Tag></div>
-        <div className="m" style={{ marginTop: 8 }}>{left} of {l.quantity} {l.unit} available{l.safety_notes ? ' · ' + l.safety_notes : ''}</div>
-        <Bar pct={(l.qty_reserved / l.quantity) * 100} />
-        <div className="acts">
-          <input className="qty" type="number" min="1" max={left} value={qty} onChange={(e) => setQty(e.target.value)} aria-label="Quantity" />
-          <select className="mini" value={rep} onChange={(e) => setRep(e.target.value)} aria-label="Representative">{reps.length ? reps.map((r) => <option key={r.id} value={r.id}>{r.name}</option>) : <option value="">No representatives</option>}</select>
-          <Btn size="sm" onClick={request} disabled={!ok}>Request food</Btn>
-        </div>
-      </div>
-    </Card>
   );
+  return (<>
+    <PageHead kicker="Food discovery" title="Discover food" sub={pos ? `Fresh listings within ${radius} km, nearest first.` : 'Fresh listings from verified donors. Share your location to sort by distance.'} />
+    {!reps.length && ok && <div className="banner warn rise"><FiUsers /><div><b>Add a pickup representative first</b><span>You choose who collects each pickup.</span></div><Btn size="sm" kind="ghost" onClick={() => setTab('profile')}>Add</Btn></div>}
+    <DiscoverBoard listings={data} error={error} reps={reps} ok={ok}
+      lockReason="Your organisation must be verified and active before you can request food."
+      controls={controls} onRequested={async () => { await onRequested(); await refresh(); }} />
+  </>);
 }
 
 /* ---------- live location sharing during a pickup ---------- */

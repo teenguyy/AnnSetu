@@ -7,13 +7,16 @@ import SignIn from './SignIn.jsx';
 import Donor from './Donor.jsx';
 import Receiver from './Receiver.jsx';
 import Admin from './Admin.jsx';
+import { initCursor } from './cursor.js';
+import { Monogram } from './brand.jsx';
 
 initTheme();
+initCursor();
 const page = document.documentElement.dataset.page; // signin | donor | ngo | admin
 const root = createRoot(document.getElementById('root'));
 
 function Fatal({ title, text }) {
-  return <div className="fatal"><h1>{title}</h1><p>{text}</p><a className="btn primary" href="index.html"><span>Back to home</span></a></div>;
+  return <div className="fatal"><Monogram size={64} /><h1>{title}</h1><p>{text}</p><a className="btn primary" href="index.html"><span>Back to home</span></a></div>;
 }
 
 function Guard({ role }) {

@@ -108,7 +108,7 @@ export default function Donor({ me }) {
   };
 
   const listingsView = (<>
-    <PageHead title="Listings" sub="Only active, unexpired food is visible to NGOs." action={<Btn onClick={() => setShowForm(!showForm)} disabled={!ok}><FiPlus /> {showForm ? 'Close' : 'New listing'}</Btn>} />
+    <PageHead kicker="Your food" title="Listings" sub="Only active, unexpired food is visible to NGOs." action={<Btn onClick={() => setShowForm(!showForm)} disabled={!ok}><FiPlus /> {showForm ? 'Close' : 'New listing'}</Btn>} />
     {!ok && <Empty>Your organisation must be verified before you can publish food.</Empty>}
     {showForm && ok && (
       <Card>
@@ -151,7 +151,7 @@ export default function Donor({ me }) {
   </>);
 
   const requestsView = (<>
-    <PageHead title="Requests" sub="Accepting reserves the quantity so it can’t be over-allocated." />
+    <PageHead kicker="Incoming" title="Requests" sub="Accepting reserves the quantity so it can’t be over-allocated." />
     {!requests.length ? <Empty>No requests yet. They appear here when verified NGOs ask for your food.</Empty> :
       requests.map((r, i) => (
         <Card key={r.id} i={i}>
@@ -166,7 +166,7 @@ export default function Donor({ me }) {
   </>);
 
   const pickupsView = (<>
-    <PageHead title="Pickups" sub="Confirm each handover with the OTP shown to the receiver." />
+    <PageHead kicker="Handover" title="Pickups" sub="Confirm each handover with the OTP shown to the receiver." />
     {!accepted.length ? <Empty>No accepted pickups waiting.</Empty> : accepted.map((r, i) => <PickupCard key={r.id} r={r} i={i} loc={locs[r.id]} onConfirm={confirm} onChat={() => setChat(r)} />)}
   </>);
 
@@ -179,7 +179,7 @@ export default function Donor({ me }) {
         {view === 'requests' && requestsView}
         {view === 'pickups' && pickupsView}
         {view === 'impact' && org && <ImpactView org={org} kind="donor" stats={stats} />}
-        {view === 'profile' && <><PageHead title="Profile" sub="Your organisation, verification and documents." /><ProfileView role="donor" user={me.user} org={org} docs={docs} onChanged={async () => { if (!org) setTab('profile'); await refresh(); }} /></>}
+        {view === 'profile' && <><PageHead kicker="Organisation" title="Profile" sub="Your organisation, verification and documents." /><ProfileView role="donor" user={me.user} org={org} docs={docs} onChanged={async () => { if (!org) setTab('profile'); await refresh(); }} /></>}
       </>}
             {chat && <ChatModal request={chat} meId={uid} title={`Chat with ${chat.ngo.name}`} onClose={() => setChat(null)} />}
       {report && <ReportModal reporterOrg={org.id} reportedOrg={report.ngo_org_id} requestId={report.id} reportedName={report.ngo.name} onClose={() => setReport(null)} />}

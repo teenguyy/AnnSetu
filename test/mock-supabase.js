@@ -81,6 +81,8 @@
     update_location(a) { db.rep_locations = db.rep_locations.filter((x) => x.request_id !== a.p_request); db.rep_locations.push({ request_id: a.p_request, lat: a.p_lat, lng: a.p_lng, updated_at: now() }); return { data: null, error: null }; },
     nearby_listings() { return { data: db.food_listings.filter((l) => l.status === 'active').map((l) => ({ ...l, donor_name: org(l.donor_org_id).name, distance_km: 2.4 })), error: null }; },
     get_leaderboard() { return { data: [], error: null }; },
+    public_impact() { const d = db.food_requests.filter((r) => r.status === 'completed'); const ok = (k) => db.organizations.filter((o) => o.kind === k && o.verification === 'approved' && !o.suspended).length; return { data: [{ donations: d.length, units: d.reduce((x, r) => x + r.quantity, 0), donors: ok('donor'), ngos: ok('ngo') }], error: null }; },
+    verify_certificate(a) { const c = db.certificates.find((x) => x.serial === String(a.p_serial || '').trim().toUpperCase()); return { data: c ? [{ org_name: org(c.org_id).name, title: c.title, issued_at: c.issued_at }] : [], error: null }; },
     set_my_role(a) { if (myOrg()) return err('Role can\'t be changed'); prof().role = a.p_role; return { data: null, error: null }; },
   };
   const filt = (rows, fs) => rows.filter((r) => fs.every((f) => f(r)));

@@ -146,29 +146,52 @@ export default function Admin({ me }) {
     <Shell roleLabel="Admin console" tabs={tabs} tab={tab} setTab={setTab} title={titles[tab]} org={null} user={me.user} notes={notes} onReadAll={readAll}>
       {tab === 'overview' && overview}
 
-      {tab === 'verify' && (<><PageHead title="Verification queue" sub="Approve only organisations whose documents you have checked." />
+      {tab === 'verify' && (<><PageHead kicker="Trust & safety" title="Verification queue" sub="Approve only organisations whose documents you have checked." />
         {pend.length ? pend.map((o, i) => orgCard(o, i, false)) : <Empty>No organisations are waiting. You’re all caught up.</Empty>}</>)}
 
-      {tab === 'orgs' && (<><PageHead title="Organisations" sub="Every registered donor and NGO." />
+      {tab === 'orgs' && (<><PageHead kicker="Directory" title="Organisations" sub="Every registered donor and NGO." />
         <div className="fl">{['all', 'donors', 'ngos', 'pending', 'approved', 'rejected', 'suspended'].map((k) => <button key={k} className={'chip' + (orgF === k ? ' on' : '')} onClick={() => setOrgF(k)}>{k === 'ngos' ? 'NGOs' : k}</button>)}</div>
         <div className="fl"><input className="search" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, type, address" aria-label="Search organisations" /></div>
         {orgsList.length ? orgsList.map((o, i) => orgCard(o, i, true)) : <Empty>No organisations match.</Empty>}</>)}
 
-      {tab === 'listings' && (<><PageHead title="Listings" sub="Oversight of every food listing. You can withdraw unsafe ones." />
+      {tab === 'listings' && (<><PageHead kicker="Oversight" title="Listings" sub="Oversight of every food listing. You can withdraw unsafe ones." />
         <div className="fl">{['all', 'active', 'reserved', 'completed', 'expired', 'withdrawn'].map((k) => <button key={k} className={'chip' + (lf === k ? ' on' : '')} onClick={() => setLf(k)}>{k}</button>)}</div>
-        {listingsList.length ? listingsList.map((l, i) => (
-          <Card key={l.id} i={i}><div className="row"><div><h3>{l.title}</h3><span className="m">{nm(l.donor_org_id)} · pickup by {fmtDT(l.pickup_by)} · {l.qty_reserved} of {l.quantity} {l.unit} reserved</span></div><Tag s={l.status} /></div>
-            {['active', 'reserved'].includes(l.status) && <div className="acts"><Btn size="sm" kind="danger" onClick={() => setModal({ title: 'Withdraw listing', label: 'Reason (sent to the donor and affected NGOs)', cta: 'Withdraw listing', run: async (r) => { need(await db.rpc('admin_withdraw_listing', { p_listing: l.id, p_reason: r })); toast('Listing withdrawn'); await refresh(); } })}>Withdraw</Btn></div>}
-          </Card>)) : <Empty>No listings to show.</Empty>}</>)}
+        {listingsList.length ? (
+          <div className="tbl-wrap rise"><table className="tbl">
+            <thead><tr><th scope="col">Food</th><th scope="col">Donor</th><th scope="col">Pickup by</th><th scope="col">Reserved</th><th scope="col">Status</th><th scope="col"><span className="sr">Actions</span></th></tr></thead>
+            <tbody>{listingsList.map((l) => (
+              <tr key={l.id}>
+                <th scope="row" data-label="Food"><b>{l.title}</b><small>{l.category}</small></th>
+                <td data-label="Donor">{nm(l.donor_org_id)}</td>
+                <td data-label="Pickup by">{fmtDT(l.pickup_by)}</td>
+                <td data-label="Reserved"><span className="num">{l.qty_reserved}</span> / {l.quantity} {l.unit}</td>
+                <td data-label="Status"><Tag s={l.status} /></td>
+                <td className="tbl-act">{['active', 'reserved'].includes(l.status) && <Btn size="sm" kind="danger" onClick={() => setModal({ title: 'Withdraw listing', label: 'Reason (sent to the donor and affected NGOs)', cta: 'Withdraw listing', run: async (r) => { need(await db.rpc('admin_withdraw_listing', { p_listing: l.id, p_reason: r })); toast('Listing withdrawn'); await refresh(); } })}>Withdraw</Btn>}</td>
+              </tr>))}</tbody>
+          </table></div>
+        ) : <Empty>No listings to show.</Empty>}</>)}
 
-      {tab === 'requests' && (<><PageHead title="Requests" sub="Read-only view of every food request." />
+      {tab === 'requests' && (<><PageHead kicker="Oversight" title="Requests" sub="Read-only view of every food request." />
         <div className="fl">{['all', 'pending', 'accepted', 'completed', 'rejected', 'cancelled'].map((k) => <button key={k} className={'chip' + (rf === k ? ' on' : '')} onClick={() => setRf(k)}>{k}</button>)}</div>
-        {reqList.length ? reqList.map((r, i) => {
-          const l = listings.find((x) => x.id === r.listing_id);
-          return <Card key={r.id} i={i}><div className="row"><div><h3>{l?.title || '(removed)'}</h3><span className="m">{nm(r.ngo_org_id)} requested {r.quantity} · from {nm(l?.donor_org_id)} · {fmtDT(r.created_at)}</span></div><Tag s={r.status} /></div></Card>;
-        }) : <Empty>No requests to show.</Empty>}</>)}
+        {reqList.length ? (
+          <div className="tbl-wrap rise"><table className="tbl">
+            <thead><tr><th scope="col">Listing</th><th scope="col">Receiver</th><th scope="col">Donor</th><th scope="col">Qty</th><th scope="col">Sent</th><th scope="col">Status</th></tr></thead>
+            <tbody>{reqList.map((r) => {
+              const l = listings.find((x) => x.id === r.listing_id);
+              return (
+                <tr key={r.id}>
+                  <th scope="row" data-label="Listing"><b>{l?.title || '(removed)'}</b>{r.rep_name ? <small>rep: {r.rep_name}</small> : null}</th>
+                  <td data-label="Receiver">{nm(r.ngo_org_id)}</td>
+                  <td data-label="Donor">{nm(l?.donor_org_id)}</td>
+                  <td data-label="Qty"><span className="num">{r.quantity}</span> {l?.unit || ''}</td>
+                  <td data-label="Sent">{fmtDT(r.created_at)}</td>
+                  <td data-label="Status"><Tag s={r.status} /></td>
+                </tr>);
+            })}</tbody>
+          </table></div>
+        ) : <Empty>No requests to show.</Empty>}</>)}
 
-      {tab === 'reports' && (<><PageHead title="Reports" sub="Complaints raised by donors and receivers." />
+      {tab === 'reports' && (<><PageHead kicker="Trust & safety" title="Reports" sub="Complaints raised by donors and receivers." />
         {reports.length ? reports.map((r, i) => (
           <Card key={r.id} i={i}>
             <div className="row"><div><h3>{r.reason.replace(/_/g, ' ')}</h3><span className="m">{nm(r.reporter_org)} reported {nm(r.reported_org)} · {fmtDT(r.created_at)}</span></div><Tag s={r.status} /></div>
@@ -183,7 +206,7 @@ export default function Admin({ me }) {
               </div>)}
           </Card>)) : <Empty>No reports. Great news.</Empty>}</>)}
 
-      {tab === 'inbox' && (<><PageHead title="Inbox" sub="Messages from the website contact form." />
+      {tab === 'inbox' && (<><PageHead kicker="Website" title="Inbox" sub="Messages from the website contact form." />
         {contacts.length ? contacts.map((c, i) => (
           <Card key={c.id} i={i}>
             <div className="row"><div><h3>{c.subject || 'No subject'}</h3><span className="m">{c.name} · {c.email} · {fmtDT(c.created_at)}</span></div><Tag s={c.status === 'new' ? 'pending' : c.status === 'replied' ? 'approved' : ''}>{c.status}</Tag></div>
@@ -193,7 +216,7 @@ export default function Admin({ me }) {
               {c.status !== 'replied' && <Btn size="sm" kind="ghost" onClick={async () => { need(await db.from('contact_messages').update({ status: 'replied' }).eq('id', c.id)); await refresh(); }}>Mark replied</Btn>}</div>
           </Card>)) : <Empty>No messages yet.</Empty>}</>)}
 
-      {tab === 'content' && (<><PageHead title="Website content" sub="FAQs and testimonials shown on the public site." />
+      {tab === 'content' && (<><PageHead kicker="Website" title="Website content" sub="FAQs and testimonials shown on the public site." />
         <Card><h3>FAQs</h3>
           {faqs.map((f) => (
             <div key={f.id} className="ck"><span style={{ flex: 1 }}><b>{f.question}</b><br /><span className="m">{f.answer}</span></span>
@@ -213,8 +236,19 @@ export default function Admin({ me }) {
             {({ busy }) => (<><Field label="Quote" wide><textarea name="quote" rows={2} maxLength={400} /></Field><Field label="Author"><input name="author" maxLength={80} /></Field><Field label="Role / organisation"><input name="role" maxLength={80} /></Field><div className="wide"><Btn type="submit" busy={busy}><FiPlus /> Add testimonial</Btn></div></>)}
           </AsyncForm></Card></>)}
 
-      {tab === 'audit' && (<><PageHead title="Audit log" sub="Every admin decision is recorded here." />
-        {audit.length ? <Card>{audit.map((a) => <div key={a.id} className="ev"><span><b>{a.action.replace(/_/g, ' ')}</b>{a.target_table ? ' · ' + a.target_table : ''}{a.details?.note || a.details?.reason ? ': ' + (a.details.note || a.details.reason) : ''}</span><small className="m">{fmtDT(a.created_at)}</small></div>)}</Card> : <Empty>No decisions yet.</Empty>}</>)}
+      {tab === 'audit' && (<><PageHead kicker="Accountability" title="Audit log" sub="Every admin decision is recorded here." />
+        {audit.length ? (
+          <div className="tbl-wrap rise"><table className="tbl">
+            <thead><tr><th scope="col">When</th><th scope="col">Action</th><th scope="col">Target</th><th scope="col">Note</th></tr></thead>
+            <tbody>{audit.map((a) => (
+              <tr key={a.id}>
+                <td data-label="When" className="nowrap">{fmtDT(a.created_at)}</td>
+                <th scope="row" data-label="Action"><b className="cap1">{a.action.replace(/_/g, ' ')}</b></th>
+                <td data-label="Target">{a.target_table || '—'}</td>
+                <td data-label="Note">{a.details?.note || a.details?.reason || '—'}</td>
+              </tr>))}</tbody>
+          </table></div>
+        ) : <Empty>No decisions yet.</Empty>}</>)}
 
       {modal && <ReasonModal title={modal.title} label={modal.label} cta={modal.cta} onSubmit={modal.run} onClose={() => setModal(null)} />}
     </Shell>

@@ -1,0 +1,419 @@
+import React, { useRef, useState, useEffect } from 'react';
+import { FiArrowRight, FiCheck, FiChevronDown } from 'react-icons/fi';
+import { gsap, ScrollTrigger, useGsap, countUp } from '../anim.js';
+import { db, configured, EMAIL_RE, errMsg, fmtD, ROUTES, publicUrl } from '../lib.js';
+import { need, myOrg, loadDiscover } from '../data.js';
+import { Btn, AsyncForm, Field, Arrow, useToast } from '../ui.jsx';
+import { DiscoverBoard, LockedBoard } from '../discover.jsx';
+import { Monogram, Wordmark } from '../brand.jsx';
+
+const canAct = (org) => !!org && org.verification === 'approved' && !org.suspended;
+
+/* 2 ─ Food waste and food insecurity ------------------------------------------------ */
+const FACTS = [
+  { n: '1.05', u: 'billion tonnes', t: 'of food was wasted worldwide in 2022, about one-fifth of all food available to consumers.', s: 'UNEP Food Waste Index Report 2024' },
+  { n: '733', u: 'million people', t: 'faced hunger in 2023, roughly one in eleven people on the planet.', s: 'FAO et al., The State of Food Security and Nutrition in the World 2024' },
+  { n: '55', u: 'kg per person', t: 'of food is wasted each year in an average Indian home.', s: 'UNEP Food Waste Index Report 2024' },
+];
+export function Story() {
+  const ref = useRef(null);
+  useGsap(ref, (reduced) => {
+    if (reduced) return;
+    gsap.to('.story-marq', { xPercent: -30, ease: 'none', scrollTrigger: { trigger: ref.current, start: 'top bottom', end: 'bottom top', scrub: true } });
+  });
+  return (
+    <section className="story" id="story" ref={ref} aria-labelledby="story-h" data-dark>
+      <div className="story-marq" aria-hidden="true">waste · hunger · waste · hunger · waste · hunger ·</div>
+      <div className="wrap story-grid">
+        <header className="story-head">
+          <span className="kick">01 / The paradox</span>
+          <h2 id="story-h" data-reveal="clip">Plenty on one side of the city. <em>Empty plates</em> on the other.</h2>
+          <p className="annot" data-reveal>the food exists, the connection doesn’t</p>
+        </header>
+        <ol className="facts">
+          {FACTS.map((f, i) => (
+            <li key={f.n} className={'fact f' + i} data-reveal>
+              <div className="fact-n"><b>{f.n}</b><span>{f.u}</span></div>
+              <p>{f.t}</p>
+              <cite>Source: {f.s}</cite>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+/* 3 ─ Mission ----------------------------------------------------------------------- */
+export function Mission() {
+  return (
+    <section className="mission" id="mission" aria-labelledby="mission-h">
+      <div className="wrap mission-grid">
+        <div className="mission-l">
+          <span className="kick">02 / Mission</span>
+          <h2 id="mission-h" data-reveal="clip">A bridge, <em>not</em> a delivery fleet.</h2>
+          <p className="lead" data-reveal>AnnSetu connects verified food donors with verified NGOs. We coordinate the match, the request and the handover. NGOs send their own representatives to collect, so every pickup stays local, accountable and human.</p>
+        </div>
+        <div className="etym" data-reveal aria-label="The name AnnSetu">
+          <p><span lang="hi">अन्न</span> <b>Ann</b> <span>food, grain</span></p>
+          <p className="plus" aria-hidden="true">+</p>
+          <p><span lang="hi">सेतु</span> <b>Setu</b> <span>bridge</span></p>
+          <Monogram size={120} draw />
+        </div>
+        <ul className="pillars" data-stagger>
+          <li><span>i.</span><h3>Verified</h3><p>Every organisation uploads documents that an admin checks before it can list or request food.</p></li>
+          <li><span>ii.</span><h3>Accountable</h3><p>Handovers are confirmed with a one-time code, so a pickup only counts when it really happened.</p></li>
+          <li><span>iii.</span><h3>Local</h3><p>Receivers discover food near them and their own people collect it, inside the pickup window.</p></li>
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+/* 4 ─ Animated donor-to-receiver journey -------------------------------------------- */
+const STEPS = [
+  ['Donor', 'Lists surplus food with quantity, safety notes and a pickup deadline.'],
+  ['AnnSetu', 'Shows it only to verified, active receivers, nearest first.'],
+  ['NGO', 'Requests a quantity and names a representative. The donor accepts and the food is reserved.'],
+  ['Collection', 'The representative collects. The donor confirms the handover with a 4-digit code.'],
+  ['Community', 'Meals reach people. Impact, badges and certificates are recorded automatically.'],
+];
+const ROUTE = 'M40 250 C 170 250, 190 80, 320 90 S 520 300, 620 250 S 790 60, 900 100 S 1060 260, 1160 200';
+export function Journey() {
+  const ref = useRef(null);
+  const [active, setActive] = useState(0);
+  const [pts, setPts] = useState([]);
+  useEffect(() => {
+    const p = ref.current && ref.current.querySelector('#jr-path');
+    if (!p || !p.getTotalLength) return;
+    const L = p.getTotalLength();
+    setPts(STEPS.map((_, i) => { const q = p.getPointAtLength((L * i) / (STEPS.length - 1)); return [q.x, q.y]; }));
+  }, []);
+  useGsap(ref, (reduced) => {
+    const mm = gsap.matchMedia();
+    if (reduced) { setActive(STEPS.length - 1); return () => mm.revert(); }
+    mm.add('(min-width: 900px)', () => {
+      const tl = gsap.timeline({
+        scrollTrigger: { trigger: ref.current, start: 'top top', end: '+=1600', scrub: 0.6, pin: '.jr-pin',
+          onUpdate: (s) => setActive(Math.min(STEPS.length - 1, Math.floor(s.progress * (STEPS.length - 0.001)))) },
+      });
+      tl.fromTo('#jr-draw', { strokeDashoffset: 1 }, { strokeDashoffset: 0, ease: 'none', duration: 1 }, 0)
+        .fromTo('.jr-marker', { motionPath: { path: '#jr-path', align: '#jr-path', alignOrigin: [0.5, 0.5], end: 0 } },
+          { motionPath: { path: '#jr-path', align: '#jr-path', alignOrigin: [0.5, 0.5], end: 1 }, ease: 'none', duration: 1 }, 0);
+    });
+    mm.add('(max-width: 899px)', () => {
+      gsap.set('#jr-draw', { strokeDashoffset: 0 });
+      ScrollSteps(ref.current, setActive);
+    });
+    return () => mm.revert();
+  });
+  return (
+    <section className="journey" id="journey" ref={ref} aria-labelledby="journey-h" data-dark>
+      <div className="jr-pin">
+        <div className="wrap">
+          <header className="jr-head">
+            <span className="kick">03 / The journey</span>
+            <h2 id="journey-h">Five stops from <em>surplus</em> to <em>served.</em></h2>
+          </header>
+          <div className="jr-stage">
+            <svg className="jr-svg" viewBox="0 0 1200 340" aria-hidden="true">
+              <path id="jr-path" d={ROUTE} className="jr-base" />
+              <path id="jr-draw" d={ROUTE} className="jr-line" pathLength="1" />
+              {pts.map(([x, y], i) => (
+                <g key={i} className={'jr-node' + (i <= active ? ' on' : '')} transform={`translate(${x} ${y})`}>
+                  <circle r="22" className="halo" /><circle r="9" className="core" />
+                  <text y={i % 2 ? 52 : -38} textAnchor="middle">{STEPS[i][0]}</text>
+                </g>
+              ))}
+              <g className="jr-marker"><rect x="-9" y="-9" width="18" height="18" transform="rotate(45)" /></g>
+            </svg>
+          </div>
+          <ol className="jr-steps">
+            {STEPS.map(([t, d], i) => (
+              <li key={t} className={i === active ? 'on' : i < active ? 'past' : ''} data-step={i}>
+                <span className="jr-no">{String(i + 1).padStart(2, '0')}</span>
+                <div><h3>{t}</h3><p>{d}</p></div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    </section>
+  );
+}
+function ScrollSteps(root, setActive) {
+  root.querySelectorAll('.jr-steps li').forEach((li, i) => {
+    ScrollTrigger.create({ trigger: li, start: 'top 70%', onEnter: () => setActive(i), onEnterBack: () => setActive(i) });
+  });
+}
+
+/* 5 ─ Food discovery (live Supabase data) ------------------------------------------- */
+export function HomeDiscover({ session }) {
+  const [state, setState] = useState({ s: 'load' });
+  const load = async () => {
+    try {
+      if (!configured) { setState({ s: 'off' }); return; }
+      const me = session;
+      const role = me?.profile?.role;
+      if (role === 'ngo') {
+        const org = await myOrg(me.user.id);
+        const reps = org ? need(await db.from('representatives').select('*').eq('org_id', org.id).order('name')) || [] : [];
+        const listings = canAct(org) ? await loadDiscover({}) : [];
+        setState({ s: 'ngo', org, reps, listings });
+        return;
+      }
+      if (role) { setState({ s: 'role', role }); return; }
+      // Signed out: an optional, privacy-safe public preview (sql/annsetu_schema_part5_public_preview.sql).
+      const r = await db.rpc('public_listings_preview', { p_limit: 24 });
+      if (!r.error && Array.isArray(r.data) && r.data.length) {
+        setState({ s: 'preview', listings: r.data.map((l) => ({ ...l, photo: publicUrl('listing-photos', l.photo_path) })) });
+      } else setState({ s: 'anon' });
+    } catch (e) { setState({ s: 'err', e }); }
+  };
+  useEffect(() => { if (session !== undefined) load(); }, [session]); // eslint-disable-line
+  const S = state.s;
+  return (
+    <section className="discover" id="discover" aria-labelledby="discover-h">
+      <div className="wrap">
+        <header className="disc-head">
+          <span className="kick">04 / Food discovery</span>
+          <h2 id="discover-h" data-reveal="clip">Food, looking for its <em>next table.</em></h2>
+          <p className="lead" data-reveal>Live listings from verified donors. Search, filter, then drag what your community needs into the request tray.</p>
+        </header>
+        {S === 'load' && <div className="board-load" aria-busy="true"><span className="skel" /><span className="skel" /><span className="skel" /></div>}
+        {S === 'ngo' && (canAct(state.org)
+          ? <DiscoverBoard listings={state.listings} reps={state.reps} ok
+            lockReason="" onRequested={load}
+            intro={!state.reps.length ? <p className="board-warn">Add a pickup representative in your dashboard before sending requests. <a href="receiver.html#profile">Add one →</a></p> : null} />
+          : <LockedBoard title="Your organisation isn’t verified yet" text="Once an admin approves your documents, live listings and the request tray open up here and in your dashboard."
+            action={<a className="btn ink has-arrow" href="receiver.html#profile"><span>Open my profile</span><Arrow /></a>} />)}
+        {S === 'preview' && <DiscoverBoard listings={state.listings} ok={false} lockReason="Sign in as a verified receiver to request food." />}
+        {S === 'role' && <LockedBoard title={state.role === 'admin' ? 'You’re signed in as an admin' : 'You’re signed in as a donor'}
+          text={state.role === 'admin' ? 'Every listing is available in the admin console.' : 'Food discovery is for verified receivers. Manage your own listings and incoming requests from your dashboard.'}
+          action={<a className="btn ink has-arrow" href={ROUTES[state.role]}><span>Go to my dashboard</span><Arrow /></a>} />}
+        {S === 'anon' && <LockedBoard title="Live listings are for verified receivers"
+          text="To protect donors, food listings are only shown to NGOs and community organisations that an admin has verified. Sign in or register as a receiver to search, filter and drag food into your request tray."
+          action={<div className="row-l"><a className="btn ink has-arrow" href="signin.html?role=ngo&view=register"><span>Register as receiver</span><Arrow /></a><a className="btn ghost" href="signin.html">Sign in</a></div>} />}
+        {S === 'off' && <LockedBoard title="Discovery is offline" text="The secure backend isn’t configured on this deployment, so no listings can be shown." />}
+        {S === 'err' && <LockedBoard title="We couldn’t load listings" text={errMsg(state.e)} action={<Btn kind="ghost" onClick={load}>Try again</Btn>} />}
+      </div>
+    </section>
+  );
+}
+
+/* 6 ─ Donor and NGO experiences ----------------------------------------------------- */
+const EXP = {
+  donor: { k: 'For donors', h: 'Turn tonight’s surplus into tomorrow’s meal.', who: 'Restaurants · hotels · canteens · event organisers',
+    steps: ['List food in under a minute, with a photo and safety notes', 'Accept or decline requests from verified NGOs', 'Confirm each handover with the receiver’s code', 'Earn badges and printable certificates'],
+    cta: 'Register as donor', href: 'signin.html?role=donor&view=register' },
+  ngo: { k: 'For NGOs & receivers', h: 'Find fresh food close to the people you serve.', who: 'NGOs · shelters · community kitchens',
+    steps: ['Discover live listings nearby, nearest first', 'Request quantities and assign your own representative', 'Share live location during pickup, if you choose to', 'Publish your community’s needs for donors to see'],
+    cta: 'Register as receiver', href: 'signin.html?role=ngo&view=register' },
+};
+export function Experiences() {
+  const [side, setSide] = useState('donor');
+  return (
+    <section className="exp" id="experiences" aria-labelledby="exp-h">
+      <h2 id="exp-h" className="sr">Donor and NGO experiences</h2>
+      <div className="exp-split" data-active={side}>
+        {Object.entries(EXP).map(([k, e]) => (
+          <article key={k} data-dark={k === 'ngo' ? '' : undefined} className={'exp-p ' + k + (side === k ? ' on' : '')} onMouseEnter={() => setSide(k)} onFocus={() => setSide(k)}>
+            <span className="kick">{k === 'donor' ? '05 / ' : ''}{e.k}</span>
+            <h3>{e.h}</h3>
+            <p className="who">{e.who}</p>
+            <ol className="exp-steps">{e.steps.map((s, i) => <li key={s}><span>{String(i + 1).padStart(2, '0')}</span>{s}</li>)}</ol>
+            <a className={'btn has-arrow ' + (k === 'donor' ? 'ink' : 'sun')} href={e.href}><span>{e.cta}</span><Arrow /></a>
+            <span className="exp-big" aria-hidden="true">{k === 'donor' ? 'give' : 'receive'}</span>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* 7 ─ Real impact statistics -------------------------------------------------------- */
+export function Impact() {
+  const ref = useRef(null);
+  const [d, setD] = useState(undefined);
+  useEffect(() => {
+    if (!configured) { setD(null); return; }
+    db.rpc('public_impact').then((r) => setD(!r.error && r.data && r.data[0] ? r.data[0] : null), () => setD(null));
+  }, []);
+  const has = d && (d.donations || d.donors || d.ngos);
+  useGsap(ref, (reduced) => {
+    if (!has) return;
+    ref.current.querySelectorAll('[data-count]').forEach((el) => countUp(el, el.getAttribute('data-count'), reduced));
+  }, [has]);
+  const items = has ? [[d.donations, 'Pickups completed', 'handovers confirmed by code'], [d.units, 'Units of food shared', 'portions, kg and packs'], [d.donors, 'Verified donors', 'kitchens giving'], [d.ngos, 'Verified receivers', 'NGOs collecting']] : [];
+  return (
+    <section className="impact" id="impact" ref={ref} aria-labelledby="impact-h" data-dark>
+      <div className="wrap">
+        <header className="imp-head">
+          <span className="kick">06 / Impact</span>
+          <h2 id="impact-h" data-reveal="clip">Real numbers. <em>Only.</em></h2>
+          <p className="lead" data-reveal>Counted live from confirmed pickups and verified organisations in the AnnSetu database.</p>
+        </header>
+        {d === undefined ? <div className="imp-grid" aria-busy="true">{[0, 1, 2, 3].map((i) => <div key={i} className="imp skel" />)}</div>
+          : has ? (
+            <dl className="imp-grid">
+              {items.map(([n, l, s], i) => (
+                <div key={l} className={'imp i' + i}>
+                  <dt>{l}<small>{s}</small></dt>
+                  <dd data-count={Number(n) || 0}>{(Number(n) || 0).toLocaleString('en-IN')}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <div className="imp-empty" data-reveal>
+              <b>0</b>
+              <p>No donations have been recorded yet. The first confirmed pickup will appear here. We never display invented figures.</p>
+            </div>
+          )}
+      </div>
+    </section>
+  );
+}
+
+/* 8 ─ Community stories (published testimonials) ------------------------------------ */
+export function Stories() {
+  const [list, setList] = useState(undefined);
+  useEffect(() => {
+    if (!configured) { setList([]); return; }
+    db.from('testimonials').select('id,quote,author_name,author_role,created_at').eq('published', true).order('created_at', { ascending: false }).limit(12)
+      .then((r) => setList(r.error ? [] : r.data || []), () => setList([]));
+  }, []);
+  const [lead, ...rest] = list || [];
+  return (
+    <section className="stories" id="stories" aria-labelledby="stories-h">
+      <div className="wrap">
+        <header className="st-head">
+          <span className="kick">07 / Community stories</span>
+          <h2 id="stories-h" data-reveal="clip">Told by the people <em>on the bridge.</em></h2>
+        </header>
+        {list === undefined ? <div className="skel st-skel" aria-busy="true" />
+          : !list.length ? (
+            <div className="st-empty" data-reveal>
+              <p className="annot">this space is waiting for real voices</p>
+              <p>Stories appear here once partners share them and an admin publishes them. We only show real quotes, used with permission.</p>
+            </div>
+          ) : (<>
+            <figure className="st-lead" data-reveal>
+              <blockquote>“{lead.quote}”</blockquote>
+              <figcaption><b>{lead.author_name}</b>{lead.author_role ? <span>{lead.author_role}</span> : null}</figcaption>
+            </figure>
+            {rest.length > 0 && (
+              <ul className="st-row" aria-label="More stories">
+                {rest.map((t) => (
+                  <li key={t.id}><blockquote>“{t.quote}”</blockquote><p><b>{t.author_name}</b>{t.author_role ? ` · ${t.author_role}` : ''}</p><small>{fmtD(t.created_at)}</small></li>
+                ))}
+              </ul>
+            )}
+          </>)}
+      </div>
+    </section>
+  );
+}
+
+/* 9 ─ Join AnnSetu: roles, contact form (→ admin inbox), FAQs (← admin content) ------- */
+export function Join({ session }) {
+  const toast = useToast();
+  const [sent, setSent] = useState(false);
+  const [faqs, setFaqs] = useState([]);
+  useEffect(() => {
+    if (!configured) return;
+    db.from('faqs').select('id,question,answer').eq('published', true).order('sort_order').then((r) => setFaqs(r.error ? [] : r.data || []), () => {});
+  }, []);
+  const role = session?.profile?.role;
+  const send = async (fd, form) => {
+    if (!configured) throw new Error('The secure backend isn’t configured on this deployment.');
+    const v = { name: String(fd.get('name') || '').trim(), email: String(fd.get('email') || '').trim(), subject: String(fd.get('subject') || '').trim() || null, message: String(fd.get('message') || '').trim() };
+    if (v.name.length < 2) throw new Error('Please tell us your name.');
+    if (!EMAIL_RE.test(v.email)) throw new Error('Enter a valid email address so we can reply.');
+    if (v.message.length < 5) throw new Error('Write a short message.');
+    need(await db.from('contact_messages').insert(v));
+    form.reset();
+    setSent(true);
+    toast('Message sent. The AnnSetu team will reply by email.');
+  };
+  return (
+    <section className="join" id="join" aria-labelledby="join-h">
+      <div className="wrap">
+        <header className="join-head">
+          <span className="kick">08 / Join AnnSetu</span>
+          <h2 id="join-h" data-reveal="clip">Bring your kitchen. <em>Bring your community.</em></h2>
+        </header>
+        <div className="join-roles" data-stagger>
+          {role ? (
+            <a className="role-link" href={ROUTES[role]}><span className="kick">Signed in</span><b>Go to my dashboard</b><FiArrowRight aria-hidden="true" /></a>
+          ) : (<>
+            <a className="role-link" href="signin.html?role=donor&view=register"><span className="kick">I have surplus food</span><b>Join as a donor</b><FiArrowRight aria-hidden="true" /></a>
+            <a className="role-link alt" href="signin.html?role=ngo&view=register"><span className="kick">I feed a community</span><b>Join as a receiver</b><FiArrowRight aria-hidden="true" /></a>
+          </>)}
+        </div>
+        <div className="join-grid">
+          <div className="contact">
+            <h3>Write to the team</h3>
+            {sent ? (
+              <div className="sent" role="status"><FiCheck aria-hidden="true" /><div><b>Thank you, your message reached our inbox.</b><p>We reply by email, usually within two working days.</p><button className="lk" onClick={() => setSent(false)}>Send another message</button></div></div>
+            ) : (
+              <AsyncForm onSubmit={send}>
+                {({ busy }) => (<>
+                  <Field label="Your name"><input name="name" autoComplete="name" maxLength={80} required /></Field>
+                  <Field label="Email"><input name="email" type="email" autoComplete="email" maxLength={120} required /></Field>
+                  <Field label="Subject" wide><input name="subject" maxLength={120} placeholder="Partnership, verification, press…" /></Field>
+                  <Field label="Message" wide><textarea name="message" rows={4} maxLength={2000} required /></Field>
+                  <div className="wide"><Btn type="submit" busy={busy} arrow>Send message</Btn></div>
+                </>)}
+              </AsyncForm>
+            )}
+          </div>
+          {faqs.length > 0 && (
+            <div className="faq">
+              <h3>Questions, answered</h3>
+              {faqs.map((f) => (
+                <details key={f.id}><summary>{f.question}<FiChevronDown aria-hidden="true" /></summary><p>{f.answer}</p></details>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* 10 ─ Minimal editorial footer (+ public certificate check) ------------------------- */
+export function Footer() {
+  const [res, setRes] = useState(null);
+  const check = async (fd) => {
+    const serial = String(fd.get('serial') || '').trim();
+    if (serial.length < 4) throw new Error('Enter the serial printed on the certificate.');
+    if (!configured) throw new Error('The secure backend isn’t configured on this deployment.');
+    const rows = need(await db.rpc('verify_certificate', { p_serial: serial })) || [];
+    setRes(rows[0] ? { ok: true, ...rows[0] } : { ok: false, serial });
+  };
+  return (
+    <footer className="foot" data-dark>
+      <div className="wrap">
+        <div className="foot-top">
+          <div className="foot-brand"><Monogram size={56} tone="reverse" /><p>Good food deserves a second journey.</p></div>
+          <nav className="foot-nav" aria-label="Footer">
+            <a href="#mission">Mission</a><a href="#journey">Journey</a><a href="#discover">Discover</a><a href="#impact">Impact</a><a href="#join">Contact</a><a href="signin.html">Sign in</a>
+          </nav>
+          <div className="foot-cert">
+            <h3>Verify a certificate</h3>
+            <AsyncForm onSubmit={check} className="cert-f">
+              {({ busy }) => (<>
+                <label className="sr" htmlFor="cert-serial">Certificate serial</label>
+                <input id="cert-serial" name="serial" placeholder="AS-XXXXXXXX" maxLength={40} autoComplete="off" />
+                <Btn type="submit" kind="sun" size="sm" busy={busy}>Check</Btn>
+              </>)}
+            </AsyncForm>
+            {res && <p className="cert-r" role="status">{res.ok ? <>Valid: <b>{res.title}</b>, issued to {res.org_name} on {fmtD(res.issued_at)}.</> : <>No certificate found for “{res.serial}”.</>}</p>}
+          </div>
+        </div>
+        <div className="foot-mega" aria-hidden="true"><Wordmark /></div>
+        <div className="foot-bot"><span>© {new Date().getFullYear()} AnnSetu</span><span>Real numbers only. No invented figures.</span><span>AnnSetu coordinates pickups; it does not run a delivery fleet.</span></div>
+      </div>
+    </footer>
+  );
+}

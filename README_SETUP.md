@@ -1,50 +1,70 @@
 # AnnSetu: setup guide
 
-## What is in this folder
-| File | What it is |
-|---|---|
-| `index.html` | Landing page (live impact numbers once you have data) |
-| `signin.html` | Sign in, create account, forgot / reset password, Google |
-| `donor.html`, `receiver.html`, `admin.html` | The three dashboards |
-| `supabase-config.js` | Your project URL + **publishable** key (safe in the browser) |
-| `assets/app.js`, `assets/app.css` | The built React app and styles (already built, no build step needed) |
-| `src/` | React source code (`npm install && npm run build` to rebuild) |
-| `sql/` | Database scripts, run in the order below |
+*Good food deserves a second journey.* AnnSetu connects surplus food from donors (restaurants, hotels, canteens) with verified NGOs whose own representatives collect it.
 
-## 1. Database (Supabase, SQL Editor). Run in this order, once
+## What is in this folder
+| Path | What it is |
+|---|---|
+| `index.html` | Cinematic homepage (React): hero, story, mission, journey, live food discovery, experiences, live impact, stories, join + contact, footer |
+| `signin.html` | Sign in, create account (role choice), Google, forgot / reset password |
+| `donor.html`, `receiver.html`, `admin.html` | The three dashboards |
+| `supabase-config.js` | Project URL + **publishable** key (safe in the browser) |
+| `assets/annsetu.css` | Design system: tokens, type, buttons, forms, tags, cursor, discovery board, tables |
+| `assets/home.css`, `assets/app.css` | Homepage / sign-in + dashboard styles |
+| `assets/js/` | Built JavaScript (ES modules, code-split: the homepage doesn't load dashboard code) |
+| `assets/brand/` | Logo set: full logo, reverse, monochrome, monogram, monochrome monogram, favicon, apple-touch icon |
+| `src/` | React source (`npm install && npm run build` to rebuild) |
+| `sql/` | Database scripts |
+| `test/` | Playwright end-to-end tests against an in-memory Supabase mock |
+
+## Run locally
+```bash
+npm install
+npm run build
+npx --yes serve -l 8080 .
+```
+Open http://localhost:8080. Do not open the files with `file://`: ES modules and sign-in redirects need a real URL.
+
+Tests (use the pre-installed Chromium/Playwright; no real database is touched):
+```bash
+npm run build && npm test
+```
+
+## 1. Database (Supabase SQL Editor). Run in this order, once
 1. `sql/annsetu_schema.sql`
 2. `sql/annsetu_schema_part2.sql`
 3. `sql/annsetu_schema_part3_fixes.sql`
-4. `sql/annsetu_schema_part4_auth_role.sql`  (lets Google sign-ups choose Donor or Receiver)
+4. `sql/annsetu_schema_part4_auth_role.sql`
+5. *(optional)* `sql/annsetu_schema_part5_public_preview.sql`: lets signed-out visitors **see** a privacy-safe preview of live listings on the homepage (title, quantity, deadline, donor name, never addresses or phones). Without it, signed-out visitors see a "live listings are for verified receivers" panel. Requesting food always needs a signed-in, verified NGO.
 
-Try them on a **test project first**. They were reviewed but never run against a live database.
+Try them on a **test project first**.
 
 ## 2. Supabase settings
-- **Authentication → URL Configuration:** set *Site URL* to your deployed site and add `https://YOUR-SITE/signin.html` and `https://YOUR-SITE/` to *Redirect URLs*. Password-reset and email-confirmation links need this.
-- **Authentication → Providers:** enable *Email*. For Google, configure the Google provider separately (client ID and secret from Google Cloud).
-- **Database → Replication / Realtime:** the SQL already adds the tables; check `notifications`, `food_requests`, `food_listings`, `rep_locations`, `messages` are listed.
-- Storage buckets (`verification-docs`, `listing-photos`, `org-logos`) are created by the SQL.
-- Optional: enable `pg_cron` and schedule `select public.expire_listings()` every 10 minutes so old listings expire on their own (command is at the bottom of part 2 / part 3).
+- **Authentication → URL Configuration:** Site URL = your deployed site; add `https://YOUR-SITE/signin.html` and `https://YOUR-SITE/` to Redirect URLs.
+- **Authentication → Providers:** enable Email; configure Google separately.
+- **Realtime:** `notifications`, `food_requests`, `food_listings`, `rep_locations`, `messages`.
+- Optional: `pg_cron` → `select public.expire_listings()` every 10 minutes.
 
 ## 3. Deploy
-Upload this whole folder to any static host (Netlify, Vercel, Cloudflare Pages, GitHub Pages). Open `index.html`.
-Do not open the files with `file://`: sign-in redirects need a real URL.
+Any static host (Vercel, Netlify, Cloudflare Pages). Run `npm run build` first (or commit `assets/js/`), then upload the folder. On Vercel: framework "Other", build command `npm run build`, output directory `.`.
 
-## 4. Your first admin
-1. Create a normal account on the sign-in page.
-2. Supabase → Authentication → Users → copy that user's UUID.
-3. Run `sql/make_first_admin.sql` with your UUID.
-4. Sign in again. You'll land on the admin console.
+## 4. First admin
+Create a normal account → copy its UUID from Supabase → run `sql/make_first_admin.sql` → sign in again.
 
 ## How the flow works
-Donor/Receiver sign up → create organisation profile → upload documents → **admin approves a document, then the organisation** → donor lists food → verified NGO requests → donor accepts (quantity reserved) → NGO sees a 4-digit OTP → donor enters the OTP at handover → pickup completed, badges and certificates are awarded.
+Sign up → organisation profile → upload documents → admin approves a document, then the organisation → donor lists food → verified NGO finds it (search, filter, sort, **drag it into the request tray** or press "Add to request") → `create_request` → donor accepts (quantity reserved) → NGO sees a 4-digit OTP → donor enters it at handover → pickup completed, badges and certificates awarded → anyone can verify a certificate serial in the homepage footer.
+
+## Design system (quick reference)
+- Colours: Deep Ocean `#164B70`, Ocean Blue `#287FA6`, Sky `#82C5DF`, Light Blue `#A8D9E9`, Sunshine `#FFE28A`, Butter `#F5D98B`, Deep Ink `#102F46`, Coral `#E87968`. No green, no gold, no plain white.
+- Type: Fraunces (headlines), Space Grotesk (labels, buttons, nav), DM Sans (body), Syne (big numbers), Caveat (rare annotations).
+- Cursor: crosshair + connection nodes on fine pointers only; hidden over text fields; drag/drop states; off on touch; no easing or trail with reduced motion.
+- Animation: GSAP + ScrollTrigger (homepage), Motion (dashboard transitions, nav indicators, discovery filtering), CSS/SVG for the rest. Everything respects `prefers-reduced-motion`.
 
 ## Security notes
 - Only the publishable key is in the browser. **Never** put a `service_role` / secret key in these files.
-- All permissions are enforced by the database (Row Level Security + RPC functions), not by the page.
-- Google sign-in users choose their role on the Create account tab before pressing the Google button; otherwise they start as Donor.
+- All permissions are enforced by the database (RLS + RPC functions), not by the page. The redesign calls exactly the same tables and RPCs as before.
 
 ## Known limits
-- No email/SMS sending beyond Supabase Auth emails (needs Edge Functions + a provider).
-- Live location needs HTTPS and the phone's location permission.
+- No email/SMS beyond Supabase Auth emails.
+- Live location needs HTTPS and location permission.
 - Photos/logos: JPG, PNG, WebP. Documents: PDF, JPG, PNG up to 5 MB.
