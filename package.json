@@ -1,0 +1,9 @@
+{
+  "name": "annsetu",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AnnSetu: surplus food redistribution. Static React build + Supabase.",
+  "scripts": { "build": "esbuild src/main.jsx --bundle --minify --format=iife --jsx=automatic --target=es2020 --define:process.env.NODE_ENV=\\\"production\\\" --outfile=assets/app.js" },
+  "dependencies": { "react": "19.2.8", "react-dom": "19.2.8", "react-icons": "5.7.0" },
+  "devDependencies": { "esbuild": "0.28.2" }
+}
