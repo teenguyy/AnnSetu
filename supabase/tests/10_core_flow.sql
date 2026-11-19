@@ -328,3 +328,12 @@ reset role;
 select tests.ok((select review_due_at > now() + interval '4 days' from public.organizations where id = :'ngo2_org'),
   'no-certificate review due in 5 business days');
 select tests.ok((select count(*) = 1 from public.jobs where kind = 'ai_no_cert_summary'), 'AI summary queued for the no-certificate request');
+
+-- ── onboarding helper ──
+select tests.as_user(:'ngo2'); set role authenticated;
+select tests.ok((select (public.my_organization() ->> 'lat')::numeric between 18.5 and 18.6), 'my_organization returns lat/lng');
+select tests.ok((select public.my_organization() ->> 'owner_id') = :'ngo2', 'my_organization returns only the caller''s organisation');
+reset role;
+select tests.as_user(:'stranger'); set role authenticated;
+select tests.ok(public.my_organization() is null, 'no organisation → null');
+reset role;

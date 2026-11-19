@@ -118,3 +118,8 @@ The full Supabase Docker stack is the target (`supabase start`). Where Docker im
 ## 9. Phase plan
 
 1. Architecture (this document) · 2. Database, RLS, functions, storage, SQL tests · 3. FastAPI core · 4. Design system · 5. Landing page · 6. Auth + wizard · 7. Dashboards · 8. Discovery, requests, OTP · 9. Representatives, routing, tracking · 10. Chat + notifications · 11. Reports + audit · 12. Leaderboards + certificates · 13. Feedback · 14. AI review + chatbot · 15. Testing, load, a11y, docs, preview deploy · 16. Android app.
+
+## 10. Sandbox note
+In the Claude Code cloud sandbox, outbound HTTPS goes through a proxy that Node's built-in `fetch`
+ignores by default. Run the web app there with `NODE_USE_ENV_PROXY=1 pnpm dev`. Vercel and normal
+machines need nothing extra.
