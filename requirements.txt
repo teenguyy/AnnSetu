@@ -1,0 +1,5 @@
+# Python dependencies for the Vercel function in api/ (the FastAPI backend in backend/)
+fastapi>=0.115
+httpx>=0.27
+pydantic>=2.7
+pydantic-settings>=2.3

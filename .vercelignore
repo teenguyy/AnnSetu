@@ -2,3 +2,8 @@ node_modules
 .git
 test
 *.zip
+backend/.venv
+backend/tests
+**/__pycache__
+backend/.pytest_cache
+backend/.ruff_cache

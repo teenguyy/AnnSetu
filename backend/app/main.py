@@ -72,7 +72,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return resp
 
     def http(request: Request) -> httpx.AsyncClient:
-        return request.app.state.http
+        # Created lazily as well, because a mounted/serverless app may not run the lifespan hook.
+        st = app.state
+        if getattr(st, "http", None) is None or st.http.is_closed:
+            st.http = httpx.AsyncClient(timeout=30)
+        return st.http
 
     def token_of(authorization: str | None) -> str | None:
         if authorization and authorization.lower().startswith("bearer "):
