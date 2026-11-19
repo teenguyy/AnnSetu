@@ -1,6 +1,7 @@
 import { BadgeCheck, Clock3, FileUp, ShieldAlert } from "lucide-react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { BasicShell } from "@/components/dashboard/basic-shell";
@@ -18,6 +19,7 @@ const STATUS = {
 } as const;
 
 async function Overview() {
+  await connection(); // per-request: session cookies, never prerendered
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
   const uid = claims?.claims?.sub;

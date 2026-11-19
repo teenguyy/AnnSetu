@@ -33,3 +33,4 @@ mobile/build/
 
 # os
 .DS_Store
+e2e/output/

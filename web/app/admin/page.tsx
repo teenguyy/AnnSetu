@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { BasicShell } from "@/components/dashboard/basic-shell";
@@ -8,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 export const metadata: Metadata = { title: "Admin" };
 
 async function AdminOverview() {
+  await connection(); // per-request: session cookies, never prerendered
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims?.sub) redirect("/sign-in?next=/admin");

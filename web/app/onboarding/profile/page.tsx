@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { AuthShell } from "@/components/auth/auth-shell";
@@ -9,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 export const metadata: Metadata = { title: "Complete your profile" };
 
 async function Wizard() {
+  await connection(); // per-request: session cookies, never prerendered
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
   const uid = claims?.claims?.sub;
@@ -19,7 +21,8 @@ async function Wizard() {
   if (profile?.role !== "donor" && profile?.role !== "ngo") redirect("/onboarding/role");
   const { data: org } = await supabase.rpc("my_organization");
   const o = (org ?? {}) as Partial<Record<string, unknown>>;
-  if (o.profile_completed_at) redirect("/dashboard");
+  // verified organisations manage their profile from the dashboard; pending/rejected ones may edit and resubmit
+  if (o.profile_completed_at && o.status === "approved") redirect("/dashboard");
   const s = (k: string) => (typeof o[k] === "string" ? (o[k] as string) : "");
   const initial: OrgDraft = {
     id: s("id") || undefined,
