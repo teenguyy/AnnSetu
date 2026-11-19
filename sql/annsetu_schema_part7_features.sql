@@ -424,3 +424,16 @@ create index if not exists audit_admin_idx    on public.audit_log (admin_id);
 create index if not exists notes_unread_idx   on public.notifications (user_id) where not read;
 
 alter publication supabase_realtime set table public.notifications, public.food_requests, public.rep_locations, public.messages;
+
+-- function privileges (browsers may call only these)
+revoke all on function public.link_my_rep(), public.my_rep_id(), public.rep_my_pickups(),
+  public.set_trip_status(uuid,text,timestamptz), public.admin_document_numbers() from public, anon;
+grant execute on function public.link_my_rep(), public.my_rep_id(), public.rep_my_pickups(),
+  public.set_trip_status(uuid,text,timestamptz), public.admin_document_numbers() to authenticated;
+
+-- helper functions: not callable by signed-out visitors
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+revoke execute on function public.has_request_on(uuid), public.i_am_approved(), public.my_org_approved(text),
+  public.my_org_id(), public.owns_listing(uuid), public.is_rep_of_request(uuid) from public, anon;
+grant execute on function public.has_request_on(uuid), public.i_am_approved(), public.my_org_approved(text),
+  public.my_org_id(), public.owns_listing(uuid), public.is_rep_of_request(uuid) to authenticated;

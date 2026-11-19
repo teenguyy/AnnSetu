@@ -5,7 +5,8 @@ export const db = configured
   ? window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } })
   : null;
 
-export const ROUTES = { donor: 'donor.html', ngo: 'receiver.html', admin: 'admin.html' };
+export const ROUTES = { donor: 'donor.html', ngo: 'receiver.html', admin: 'admin.html', rep: 'rep.html' };
+export const API_URL = (window.ANNSETU_API_URL || '').replace(/\/$/, '');
 export const SIGNIN = 'signin.html';
 
 /* ---------- theme (light by default, remembered) ---------- */

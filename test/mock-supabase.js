@@ -2,7 +2,7 @@
 (function () {
   const K = '__mockdb', SK = '__mocksess';
   const uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 3) | 8).toString(16); });
-  const T = ['profiles','organizations','representatives','food_listings','food_requests','pickup_otps','requirements','notifications','messages','reports','badge_definitions','org_badges','certificates','verification_documents','contact_messages','faqs','testimonials','audit_log','rep_locations','users'];
+  const T = ['profiles','organizations','representatives','food_listings','food_requests','pickup_otps','requirements','notifications','messages','reports','badge_definitions','org_badges','certificates','verification_documents','contact_messages','faqs','testimonials','audit_log','rep_locations','users','document_reviews','leaderboard_overrides','app_settings','landing_snapshots'];
   let db = JSON.parse(localStorage.getItem(K) || 'null');
   if (!db) {
     db = {}; T.forEach((t) => (db[t] = []));
@@ -11,6 +11,7 @@
       { code: 'regular_giver', applies_to: 'donor', name: 'Regular giver', metric: 'donations', threshold: 5 },
       { code: 'first_pickup', applies_to: 'ngo', name: 'First pickup', metric: 'donations', threshold: 1 }];
   }
+  T.forEach((t) => { if (!db[t]) db[t] = []; });
   const save = () => localStorage.setItem(K, JSON.stringify(db));
   const uid = () => localStorage.getItem(SK);
   const me = () => db.users.find((u) => u.id === uid());
@@ -34,6 +35,55 @@
     });
   };
   const rpcs = {
+    link_my_rep() {
+      const u = me(); if (!u) return err('Not signed in');
+      let r = db.representatives.find((x) => x.user_id === u.id);
+      if (!r) { r = db.representatives.find((x) => (x.email || '').toLowerCase() === u.email.toLowerCase() && !x.user_id); if (!r) return { data: { linked: false }, error: null }; r.user_id = u.id; if (!myOrg() && prof().role !== 'admin') prof().role = 'rep'; notify(r.org_id, 'Representative joined', r.name); }
+      return { data: { linked: true, rep_id: r.id, name: r.name, org_name: org(r.org_id).name }, error: null };
+    },
+    rep_my_pickups() {
+      const reps = db.representatives.filter((x) => x.user_id === uid()).map((x) => x.id);
+      return { data: db.food_requests.filter((r) => reps.includes(r.rep_id) && ['accepted', 'completed'].includes(r.status)).map((r) => {
+        const l = db.food_listings.find((x) => x.id === r.listing_id), d = org(l.donor_org_id), n = org(r.ngo_org_id), o = db.pickup_otps.find((x) => x.request_id === r.id);
+        return { request_id: r.id, status: r.status, trip_status: r.trip_status || 'assigned', eta: r.eta || null, quantity: r.quantity, listing_title: l.title, unit: l.unit, category: l.category, pickup_by: l.pickup_by, safety_notes: l.safety_notes, photo_path: l.photo_path, donor_name: d.name, donor_phone: d.phone, donor_address: d.address, donor_lat: d.lat, donor_lng: d.lng, ngo_name: n.name, ngo_phone: n.phone, otp: r.status === 'accepted' && o ? o.otp : null, created_at: r.created_at };
+      }), error: null };
+    },
+    set_trip_status(a) {
+      const r = db.food_requests.find((x) => x.id === a.p_request); if (!r) return err('Request not found');
+      const isRep = db.representatives.find((x) => x.id === r.rep_id && x.user_id === uid());
+      if (!isRep && org(r.ngo_org_id).owner_id !== uid()) return err('Only the assigned representative or the NGO can update this pickup');
+      if (r.status !== 'accepted') return err('This pickup is not active');
+      r.trip_status = a.p_status; r.eta = a.p_eta || (a.p_status === 'arrived' ? now() : r.eta); r.trip_updated_at = now();
+      const l = db.food_listings.find((x) => x.id === r.listing_id);
+      const msg = (r.rep_name || 'The representative') + (a.p_status === 'on_the_way' ? ' is on the way' : ' has arrived') + ' for "' + l.title + '"';
+      notify(l.donor_org_id, 'Pickup update', msg); notify(r.ngo_org_id, 'Pickup update', msg); return { data: null, error: null };
+    },
+    public_leaderboard(a) {
+      const pct = Number((db.app_settings.find((x) => x.key === 'leaderboard_percent') || { value: 25 }).value);
+      const rows = db.organizations.filter((o) => o.kind === a.p_kind && o.verification === 'approved' && !o.suspended).map((o) => {
+        const done = db.food_requests.filter((r) => r.status === 'completed' && (o.kind === 'ngo' ? r.ngo_org_id === o.id : db.food_listings.find((l) => l.id === r.listing_id).donor_org_id === o.id));
+        const ov = db.leaderboard_overrides.find((x) => x.org_id === o.id);
+        return { org_id: o.id, name: o.name, org_type: o.org_type, pickups: done.length, units: done.reduce((x, r) => x + r.quantity, 0), action: ov && ov.action };
+      }).filter((x) => x.pickups > 0 && x.action !== 'hide').sort((x, y) => (y.action === 'pin') - (x.action === 'pin') || y.units - x.units);
+      const n = Math.max(1, Math.ceil(rows.length * pct / 100));
+      return { data: rows.map((x, i) => ({ ...x, rank: i + 1, curated: !!x.action, pinned: x.action === 'pin' })).filter((x) => x.rank <= n || x.pinned), error: null };
+    },
+    latest_landing() { const s = db.landing_snapshots[db.landing_snapshots.length - 1]; return { data: s ? { ...s.data, taken_at: s.taken_at } : {}, error: null }; },
+    admin_refresh_landing() {
+      if (prof().role !== 'admin') return err('Admins only');
+      const d = db.food_requests.filter((r) => r.status === 'completed');
+      db.landing_snapshots.push({ id: uuid(), taken_at: now(), data: { pickups: d.length, units: d.reduce((x, r) => x + r.quantity, 0), week_pickups: d.length, week_units: d.reduce((x, r) => x + r.quantity, 0), listings_week: db.food_listings.length, top_donor: (rpcs.public_leaderboard({ p_kind: 'donor' }).data[0] || {}).name || null } });
+      db.audit_log.push({ id: uuid(), admin_id: uid(), action: 'landing_refreshed', details: {}, created_at: now() }); return { data: null, error: null };
+    },
+    admin_set_leaderboard(a) {
+      if (prof().role !== 'admin') return err('Admins only');
+      db.leaderboard_overrides = db.leaderboard_overrides.filter((x) => x.org_id !== a.p_org);
+      if (a.p_action !== 'clear') { if (!(a.p_reason || '').trim()) return err('A reason is required'); db.leaderboard_overrides.push({ org_id: a.p_org, action: a.p_action, boost: a.p_boost || 0, reason: a.p_reason, admin_id: uid() }); }
+      db.audit_log.push({ id: uuid(), admin_id: uid(), action: 'leaderboard_' + a.p_action, details: { reason: a.p_reason }, created_at: now() }); return { data: null, error: null };
+    },
+    admin_set_setting(a) { if (prof().role !== 'admin') return err('Admins only'); db.app_settings = db.app_settings.filter((x) => x.key !== a.p_key); db.app_settings.push({ key: a.p_key, value: a.p_value }); return { data: null, error: null }; },
+    admin_warn_org(a) { if (prof().role !== 'admin') return err('Admins only'); const r = db.reports.find((x) => x.id === a.p_report); if (r.status === 'open') r.status = 'reviewing'; notify(r.reported_org, 'Warning from AnnSetu admin', a.p_message); db.audit_log.push({ id: uuid(), admin_id: uid(), action: 'report_warning', details: { message: a.p_message }, created_at: now() }); return { data: null, error: null }; },
+    is_admin() { return { data: prof() && prof().role === 'admin', error: null }; },
     create_request(a) {
       const o = myOrg(); if (!o || o.kind !== 'ngo' || o.verification !== 'approved' || o.suspended) return err('Only verified, active NGOs can request food');
       const rep = db.representatives.find((r) => r.id === a.p_rep && r.org_id === o.id); if (!rep) return err('Choose one of your own representatives');
@@ -128,7 +178,7 @@
   }
   const listeners = [];
   const auth = {
-    async getSession() { const u = me(); return { data: { session: u ? { user: { id: u.id, email: u.email } } : null }, error: null }; },
+    async getSession() { const u = me(); return { data: { session: u ? { user: { id: u.id, email: u.email }, access_token: 'mock-token-' + u.id } : null }, error: null }; },
     onAuthStateChange(cb) { listeners.push(cb); return { data: { subscription: { unsubscribe() {} } } }; },
     async signInWithPassword({ email, password }) { const u = db.users.find((x) => x.email === email && x.password === password); if (!u) return { data: null, error: { message: 'Invalid login credentials' } }; localStorage.setItem(SK, u.id); return { data: { user: u }, error: null }; },
     async signUp({ email, password, options }) {
@@ -140,7 +190,7 @@
     async signOut() { localStorage.removeItem(SK); return { error: null }; },
     async updateUser({ password }) { me().password = password; save(); return { data: {}, error: null }; },
     async resetPasswordForEmail() { return { data: {}, error: null }; },
-    async signInWithOAuth() { return { data: {}, error: null }; },
+    async signInWithOAuth({ provider }) { window.__oauth = provider; if (provider === 'apple') return { data: null, error: { message: 'Unsupported provider: provider is not enabled' } }; return { data: {}, error: null }; },
   };
   const chan = () => { const c = { on() { return c; }, subscribe() { return c; } }; return c; };
   window.supabase = {

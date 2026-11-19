@@ -117,12 +117,22 @@ const shot = (p, n) => p.screenshot({ path: path.join(SHOTS, n + '.png') });
   ok(true, 'wrong credentials show friendly error');
   await click('Forgot password?'); await T('text=Send reset link'); await page.fill('input[name=email]', 'a@b.org'); await click('Send reset link'); await T('.done'); ok(true, 'forgot-password flow reaches confirmation');
   await page.goto(B + 'signin.html'); await T('.art'); ok(await page.getByRole('button', { name: /Continue with Google/ }).isVisible(), 'Google sign-in still offered');
+  ok(await page.getByRole('button', { name: /Continue with Apple/ }).isVisible() && await page.getByRole('button', { name: /Continue with Microsoft/ }).isVisible(), 'Apple and Microsoft sign-in offered');
+  await page.getByRole('button', { name: /Continue with Microsoft/ }).click(); await page.waitForTimeout(200);
+  ok(await page.evaluate(() => window.__oauth) === 'azure', 'Microsoft button starts Supabase OAuth with the azure provider');
+  await page.getByRole('button', { name: /Continue with Apple/ }).click(); await page.waitForSelector('.toast.bad');
+  ok(/Apple sign-in isn’t switched on yet/.test(await page.textContent('.toast.bad')), 'a provider that is not enabled shows a friendly message');
+  ok(await page.locator('.bot-fab').count() === 0, 'assistant stays hidden until the AI service is configured');
+  await page.goto(B + 'signin.html?view=register'); await T('.art');
+  await page.getByRole('button', { name: /^03 ?Representative/ }).click(); await page.waitForTimeout(150);
+  ok(/same email your NGO saved/.test(await page.textContent('.rep-note')), 'Representative sign-up explains how accounts link to the NGO');
 
   console.log('REGISTER (email confirmation on)');
   await reg('donor@t.org', 'Donor', 'Dina Donor'); await T('.done'); ok(/Check your email/.test(await page.textContent('.done')), 'registration shows check-your-email');
   await reg('ngo@t.org', 'Receiver', 'Nina NGO'); await T('.done');
   await reg('admin@t.org', 'Donor', 'Ada Admin'); await T('.done');
   await reg('group@t.org', 'Receiver', 'Gita Group'); await T('.done');
+  await reg('ravi@t.org', 'Representative', 'Ravi Rao'); await T('.done');
   await page.evaluate(() => window.__mock.setAdmin('admin@t.org'));
 
   console.log('DONOR: profile + document');
@@ -143,7 +153,9 @@ const shot = (p, n) => p.screenshot({ path: path.join(SHOTS, n + '.png') });
   await as('ngo@t.org', 'receiver.html'); await T('input[name=name]');
   await fillProfile('Asha Kitchen', '21 Park Street, Kolkata', { ngo: true }); await click('Create profile'); await T('.docs');
   await page.locator('form').filter({ hasText: 'Add representative' }).locator('input[name=name]').fill('Ravi');
-  await page.locator('form').filter({ hasText: 'Add representative' }).locator('input[name=phone]').fill('9999999999'); await click('Add representative'); await T('text=Ravi');
+  await page.locator('form').filter({ hasText: 'Add representative' }).locator('input[name=phone]').fill('9999999999');
+  await page.locator('form').filter({ hasText: 'Add representative' }).locator('input[name=email]').fill('ravi@t.org'); await click('Add representative'); await T('text=Ravi');
+  ok(/Can sign up as representative/.test(await page.textContent('.rep-row')), 'NGO’s representative list shows the email and invite status');
   await page.setInputFiles('input[name=document]', { name: 'reg.pdf', mimeType: 'application/pdf', buffer: Buffer.from('x') }); await click('Upload document'); await T('.doc');
   ok(true, 'NGO profile, representative and document saved');
 
@@ -224,8 +236,21 @@ const shot = (p, n) => p.screenshot({ path: path.join(SHOTS, n + '.png') });
   const otp = await page.textContent('.otpv'); ok(/^\d{4}$/.test(otp), 'NGO sees the pickup OTP: ' + otp);
   await shot(page, 'ngo-pickup');
 
+  console.log('REPRESENTATIVE: pickup page, directions, ETA');
+  await as('ravi@t.org', 'rep.html'); await T('.rep-pick');
+  ok(/Hi Ravi/.test(await page.textContent('.hero')), 'representative account links to the NGO automatically');
+  ok((await page.textContent('.rep-pick .otpv')).trim() === otp, 'representative sees the same pickup OTP');
+  ok(/Directions/.test(await page.textContent('.rep-pick')) && (await page.locator('.rep-pick a[href*="google.com/maps/dir"]').getAttribute('href')).includes('destination='), 'representative gets Google Maps directions to the donor');
+  ok(/Spice Route Restaurant/.test(await page.textContent('.rep-pick')) && await page.locator('.rep-pick a[href^="tel:"]').count() === 1, 'representative sees donor name, address and a call button');
+  await page.locator('.trip-acts select').selectOption('30'); await click('On the way'); await page.waitForSelector('.toast');
+  ok(/on the way/i.test(await page.textContent('.toast')), 'representative marks “On the way” with an ETA');
+  await page.waitForTimeout(400); ok(/ETA/.test(await page.textContent('.trip-eta')), 'ETA is shown on the pickup');
+  await shot(page, 'rep-pickup');
+
   console.log('DONOR: confirm OTP');
   await as('donor@t.org', 'donor.html'); await T('.hero'); await hash('pickups'); await T('.otp');
+  ok(/On the way/.test(await page.textContent('.trip .now')) && /ETA/.test(await page.textContent('.trip-eta')), 'donor tracks the representative: on the way, with ETA');
+  ok(await page.evaluate(() => window.__mock.db.notifications.filter((n) => n.title === 'Pickup update').length) >= 2, 'both donor and NGO were notified of the trip update');
   await page.fill('.otp', '0000'); await click('Confirm collection'); await T('.toast.bad'); ok(true, 'wrong OTP rejected');
   await page.fill('.otp', otp); await click('Confirm collection'); await page.waitForFunction(() => /Pickup confirmed/.test(document.body.innerText)); ok(true, 'correct OTP completes the donation');
   await hash('impact'); await T('.bd.on'); ok(await page.locator('.bd.on').count() >= 1, 'badge awarded after first donation');
@@ -239,12 +264,26 @@ const shot = (p, n) => p.screenshot({ path: path.join(SHOTS, n + '.png') });
   ok(await page.evaluate(() => document.documentElement.dataset.theme) === 'dark', 'dark mode toggles');
   await page.locator('button[aria-label^="Switch to light"]').click();
 
+  console.log('ADMIN: leaderboard + weekly landing snapshot');
+  await as('admin@t.org', 'admin.html'); await T('.hero'); await hash('leaderboard'); await T('.lb-row');
+  ok(/Spice Route Restaurant/.test(await page.textContent('main')), 'admin sees the donor leaderboard');
+  await click('Refresh now'); await page.waitForSelector('.toast'); ok(/refreshed/i.test(await page.textContent('.toast')), 'admin can refresh landing numbers now (otherwise weekly)');
+  await page.locator('.lb-row', { hasText: 'Spice Route Restaurant' }).getByRole('button', { name: /Pin/ }).click(); await T('.modal textarea');
+  await page.fill('.modal textarea', 'Featured partner this week'); await page.locator('.modal').getByRole('button', { name: 'Pin' }).click(); await page.waitForTimeout(500);
+  ok(await page.locator('.lb-row', { hasText: 'Spice Route Restaurant' }).locator('.tag').count() === 1, 'admin can curate the leaderboard (pinned, with a reason)');
+
   console.log('HOMEPAGE: live impact, stories, certificate check');
   const serial = await page.evaluate(() => window.__mock.db.certificates[0].serial);
   await signOutLocal(); await page.goto(B); await T('.hero-h');
   await page.locator('#impact').scrollIntoViewIfNeeded(); await page.waitForTimeout(2600);
   ok(await page.locator('#impact dd').first().textContent() === '1', 'impact counter shows the real completed pickup count (1)');
   ok(/biryani reached forty/.test(await page.textContent('#stories')), 'published testimonial appears in community stories');
+  ok(/This week/.test(await page.textContent('.imp-week')), 'landing shows the weekly snapshot');
+  await page.locator('#leaderboard').scrollIntoViewIfNeeded(); await page.waitForTimeout(400);
+  ok(/Spice Route Restaurant/.test(await page.textContent('#leaderboard')), 'public leaderboard shows top donors to everyone');
+  await page.getByRole('tab', { name: 'Top receivers' }).click(); await page.waitForTimeout(200);
+  ok(/Asha Kitchen/.test(await page.textContent('#leaderboard')), 'public leaderboard shows top receivers');
+  ok(await page.locator('#app h2').count() === 1 && /Representative mode/.test(await page.textContent('#app')), 'homepage has an About the app section');
   await page.fill('#cert-serial', serial); await page.locator('.foot').getByRole('button', { name: 'Check' }).click(); await T('.cert-r');
   ok(/Valid/.test(await page.textContent('.cert-r')), 'footer verifies a real certificate serial');
   await page.fill('#cert-serial', 'AS-NOPE0000'); await page.locator('.foot').getByRole('button', { name: 'Check' }).click(); await page.waitForFunction(() => /No certificate found/.test(document.querySelector('.cert-r').innerText));
@@ -285,6 +324,31 @@ const shot = (p, n) => p.screenshot({ path: path.join(SHOTS, n + '.png') });
   const sheet = await page.locator('.hnav-sheet').boundingBox();
   ok(sheet && sheet.height > 400, 'mobile homepage menu opens full-screen');
   await shot(page, 'home-menu-390');
+
+  console.log('AI SERVICE CONNECTED: chatbot + AI document check');
+  const state = await page.evaluate(() => localStorage.getItem('__mockdb'));
+  const apiCtx = await newCtx();
+  await apiCtx.addInitScript((st) => { window.ANNSETU_API_URL = 'http://api.test'; if (!sessionStorage.getItem('seeded')) { localStorage.setItem('__mockdb', st); sessionStorage.setItem('seeded', '1'); } }, state);
+  const apiCalls = [];
+  await apiCtx.route('http://api.test/**', async (r) => {
+    const u = new URL(r.request().url()); apiCalls.push({ path: u.pathname, auth: r.request().headers().authorization || '' });
+    const body = u.pathname === '/chat' ? { reply: 'Restaurants, hotels and canteens can donate. Sign up as a Donor to start.', role: 'observer' }
+      : { id: 'r1', summary: 'FSSAI licence for Spice Route Restaurant.', checks: [], confidence: 90, recommendation: 'looks_valid' };
+    await r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+  });
+  const ap = await apiCtx.newPage(); ap.on('pageerror', (e) => errs.push(e.message));
+  await ap.goto(B); await ap.waitForSelector('.bot-fab');
+  await ap.click('.bot-fab'); await ap.waitForSelector('.bot-panel');
+  await ap.locator('.bot-starters button').first().click(); await ap.waitForSelector('.bot-bub.assistant:not(.typing)');
+  ok(/Sign up as a Donor/.test(await ap.textContent('.bot-bub.assistant:not(.typing)')), 'chatbot answers visitors (observers)');
+  await shot(ap, 'chatbot');
+  await ap.goto(B + 'signin.html'); await ap.fill('input[name=email]', 'admin@t.org'); await ap.fill('input[name=password]', 'Secret123!'); await ap.getByRole('button', { name: 'Sign in' }).first().click(); await ap.waitForURL('**/admin.html');
+  await ap.evaluate(() => (location.hash = 'orgs')); await ap.waitForSelector('.doc');
+  await ap.locator('.card', { hasText: 'Spice Route Restaurant' }).getByRole('button', { name: /AI check|Re-check/ }).first().click(); await ap.waitForSelector('.toast');
+  ok(/AI check complete/.test(await ap.textContent('.toast')), 'admin runs the AI document check from the verification card');
+  ok(apiCalls.some((c) => c.path === '/ai/review-document' && /^Bearer mock-token-/.test(c.auth)), 'AI check is sent to FastAPI with the admin’s own session token');
+  ok(await ap.locator('.bot-fab').count() === 1, 'assistant is also available inside dashboards');
+  await apiCtx.close();
 
   console.log('TOUCH + REDUCED MOTION');
   const touch = await newCtx({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });

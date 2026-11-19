@@ -260,6 +260,8 @@ export function Impact() {
     db.rpc('public_impact').then((r) => setD(!r.error && r.data && r.data[0] ? r.data[0] : null), () => setD(null));
   }, []);
   const has = d && (d.donations || d.donors || d.ngos);
+  const [wk, setWk] = useState(null);
+  useEffect(() => { if (configured) db.rpc('latest_landing').then((r) => { if (!r.error && r.data && r.data.taken_at) setWk(r.data); }, () => {}); }, []);
   useGsap(ref, (reduced) => {
     if (!has) return;
     ref.current.querySelectorAll('[data-count]').forEach((el) => countUp(el, el.getAttribute('data-count'), reduced));
@@ -289,6 +291,77 @@ export function Impact() {
               <p>No donations have been recorded yet. The first confirmed pickup will appear here. We never display invented figures.</p>
             </div>
           )}
+        {wk && (
+          <p className="imp-week" data-reveal>
+            <b>This week</b> {Number(wk.week_pickups) || 0} pickups · {(Number(wk.week_units) || 0).toLocaleString('en-IN')} units shared · {Number(wk.listings_week) || 0} new listings
+            {wk.top_donor ? <> · top donor <b>{wk.top_donor}</b></> : null}
+            <small> · weekly snapshot, updated {new Date(wk.taken_at).toLocaleDateString([], { day: 'numeric', month: 'short' })}</small>
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* Public leaderboard: top % of donors and receivers, visible to everyone ------------- */
+export function Leaderboard() {
+  const [k, setK] = useState('donor');
+  const [rows, setRows] = useState({});
+  useEffect(() => {
+    if (!configured) { setRows({ donor: [], ngo: [] }); return; }
+    ['donor', 'ngo'].forEach((kind) => db.rpc('public_leaderboard', { p_kind: kind }).then((r) => setRows((x) => ({ ...x, [kind]: r.error ? [] : r.data || [] })), () => setRows((x) => ({ ...x, [kind]: [] }))));
+  }, []);
+  const list = rows[k];
+  return (
+    <section className="lboard" id="leaderboard" aria-labelledby="lb-h">
+      <div className="wrap">
+        <header className="lb-head">
+          <span className="kick">Leaderboard</span>
+          <h2 id="lb-h" data-reveal="clip">The people <em>moving food</em></h2>
+          <p className="lead" data-reveal>The most active verified donors and receivers, by food shared through confirmed pickups.</p>
+          <div className="lb-tabs" role="tablist" aria-label="Leaderboard type">
+            <button role="tab" aria-selected={k === 'donor'} className={k === 'donor' ? 'on' : ''} onClick={() => setK('donor')}>Top donors</button>
+            <button role="tab" aria-selected={k === 'ngo'} className={k === 'ngo' ? 'on' : ''} onClick={() => setK('ngo')}>Top receivers</button>
+          </div>
+        </header>
+        {list === undefined ? <div className="lb-list" aria-busy="true">{[0, 1, 2].map((i) => <div key={i} className="lb-item skel" />)}</div>
+          : list.length ? (
+            <ol className="lb-list">
+              {list.map((x) => (
+                <li key={x.org_id} className={'lb-item' + (x.rank <= 3 ? ' top' + x.rank : '')}>
+                  <span className="lb-rank" aria-label={'Rank ' + x.rank}>{x.rank}</span>
+                  <span className="lb-name"><b>{x.name}</b><small>{x.org_type}{x.pinned ? ' · featured' : ''}</small></span>
+                  <span className="lb-num"><b>{Number(x.units).toLocaleString('en-IN')}</b><small>units · {x.pickups} pickups</small></span>
+                </li>
+              ))}
+            </ol>
+          ) : <p className="lb-empty" data-reveal>The leaderboard appears after the first confirmed pickups. Rankings are never invented.</p>}
+      </div>
+    </section>
+  );
+}
+
+/* About the app -------------------------------------------------------------------- */
+export function AppAbout() {
+  return (
+    <section className="appabout" id="app" aria-labelledby="app-h">
+      <div className="wrap app-grid">
+        <div>
+          <span className="kick">The AnnSetu app</span>
+          <h2 id="app-h" data-reveal="clip">AnnSetu, <em>in your pocket</em></h2>
+          <p className="lead" data-reveal>An Android app for donors, receivers and representatives, built on the same secure account as this website.</p>
+          <ul className="app-feats" data-reveal>
+            <li><b>Post surplus food in seconds</b> with a photo, quantity and pickup window.</li>
+            <li><b>Push notifications</b> when food is nearby, a request is accepted or your representative is on the way.</li>
+            <li><b>Representative mode</b> with turn-by-turn directions, the pickup OTP and live location.</li>
+            <li><b>Same login</b>: everything stays in sync with the website.</li>
+          </ul>
+          <p className="app-status" data-reveal><span className="tag pending">In development</span> We’ll share the download link here when it is published. Until then, the website works fully on phones.</p>
+        </div>
+        <div className="app-phone" aria-hidden="true">
+          <div className="phone"><div className="ph-top" /><div className="ph-card"><b>Veg biryani · 40 portions</b><span>Hotel Sunrise · 1.2 km</span><i>Request</i></div>
+            <div className="ph-card alt"><b>Ravi is on the way</b><span>ETA 6:40 PM</span></div><div className="ph-otp">OTP <b>4 8 1 7</b></div></div>
+        </div>
       </div>
     </section>
   );
@@ -421,7 +494,7 @@ export function Footer() {
             <small>Connect · Share · Nourish</small>
           </div>
           <nav className="foot-cols" aria-label="Footer">
-            <div><h3>Platform</h3><a href="#discover">Explore food</a><a href="#journey">How it works</a><a href="#impact">Impact</a><a href="#stories">Stories</a></div>
+            <div><h3>Platform</h3><a href="#discover">Explore food</a><a href="#journey">How it works</a><a href="#impact">Impact</a><a href="#leaderboard">Leaderboard</a><a href="#app">The app</a></div>
             <div><h3>Get involved</h3><a href="signin.html?role=donor&view=register">Join as a donor</a><a href="signin.html?role=ngo&view=register">Join as a receiver</a><a href="signin.html">Sign in</a></div>
             <div><h3>Trust & support</h3><a href="#mission">About AnnSetu</a><a href="#join">Contact the team</a><a href="#join">FAQ</a></div>
           </nav>

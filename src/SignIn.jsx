@@ -71,7 +71,7 @@ function Scene({ kind }) {
 }
 
 function Art({ view, role }) {
-  const kind = view === 'register' ? (role === 'donor' ? 'donor' : role === 'ngo' ? 'ngo' : 'choose') : 'signin';
+  const kind = view === 'register' ? (role === 'donor' ? 'donor' : role === 'ngo' || role === 'rep' ? 'ngo' : 'choose') : 'signin';
   const [title, text] = COPY[kind];
   return (
     <section className={'art art-' + kind} aria-label="About AnnSetu" data-dark>
@@ -103,12 +103,15 @@ function PassField({ label, name, autoComplete, placeholder, meter, value, onCha
 const GOOGLE = (
   <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.5 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.6 17.7 9.5 24 9.5z" /><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z" /><path fill="#FBBC05" d="M10.4 28.7c-.5-1.5-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6.1C.9 16.5 0 20.1 0 24s.9 7.5 2.6 10.8l7.8-6.1z" /><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2.1 1.4-4.7 2.3-7.7 2.3-6.3 0-11.7-4.1-13.6-9.8l-7.8 6.1C6.5 42.6 14.6 48 24 48z" /></svg>
 );
+const APPLE = <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9s-2-.9-3.4-.9c-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.4.8 2.2-1.3 3.1-2.5c1-1.4 1.4-2.8 1.4-2.9-.1 0-2.7-1-2.7-4.1zM13.9 4.9c.7-.9 1.2-2 1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.2.1 2.3-.6 3.1-1.5z"/></svg>;
+const MICROSOFT = <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#F25022" d="M2 2h9.5v9.5H2z"/><path fill="#7FBA00" d="M12.5 2H22v9.5h-9.5z"/><path fill="#00A4EF" d="M2 12.5h9.5V22H2z"/><path fill="#FFB900" d="M12.5 12.5H22V22h-9.5z"/></svg>;
+const PROVIDERS = [['google', 'Google', GOOGLE], ['apple', 'Apple', APPLE], ['azure', 'Microsoft', MICROSOFT]];
 
 export default function SignIn() {
   const toast = useToast();
   const qs = new URLSearchParams(location.search);
   const [view, setView] = useState(qs.get('view') === 'register' ? 'register' : 'login'); // login | register | forgot | recovery | done
-  const [role, setRole] = useState(qs.get('role') === 'ngo' || qs.get('role') === 'donor' ? qs.get('role') : '');
+  const [role, setRole] = useState(['ngo', 'donor', 'rep'].includes(qs.get('role')) ? qs.get('role') : '');
   const [pw, setPw] = useState('');
   const [done, setDone] = useState(null);
   const [checking, setChecking] = useState(true);
@@ -123,6 +126,10 @@ export default function SignIn() {
     if (pick && r !== pick && r !== 'admin') {
       const { error } = await db.rpc('set_my_role', { p_role: pick });
       if (!error) r = pick;
+    }
+    // Representatives: link this account to the NGO that added this email.
+    if (r !== 'admin') {
+      try { const { data } = await db.rpc('link_my_rep'); if (data && data.linked) r = 'rep'; } catch (e) {}
     }
     if (!r) throw new Error('Your profile isn’t ready yet. Please try again in a moment.');
     location.replace(ROUTES[r] || ROUTES.donor);
@@ -183,10 +190,20 @@ export default function SignIn() {
     history.replaceState(null, '', location.pathname);
     await route();
   };
-  const google = async () => {
+  const oauth = async (provider) => {
     try { if (role) sessionStorage.setItem('annsetu_role_pick', role); } catch (e) {}
-    need(await db.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } }));
+    try {
+      need(await db.auth.signInWithOAuth({ provider, options: { redirectTo: location.origin + location.pathname, scopes: provider === 'azure' ? 'email' : undefined } }));
+    } catch (e) {
+      const name = PROVIDERS.find((x) => x[0] === provider)[1];
+      toast(/not enabled|unsupported provider/i.test(errMsg(e)) ? `${name} sign-in isn’t switched on yet. Use email for now.` : errMsg(e), 'bad');
+    }
   };
+  const social = (verb) => (
+    <div className="wide social">{PROVIDERS.map(([id, name, icon]) => (
+      <Btn key={id} kind="ghost" className="full" onClick={() => oauth(id)}>{icon} {verb} {name}</Btn>
+    ))}</div>
+  );
 
   const t = titles[view];
   return (
@@ -217,7 +234,7 @@ export default function SignIn() {
                   <div className="row wide"><label className="ck2"><input type="checkbox" defaultChecked /> Keep me signed in</label><button type="button" className="lk" onClick={() => setView('forgot')}>Forgot password?</button></div>
                   <div className="wide"><Btn type="submit" busy={busy} className="full" arrow>Sign in</Btn></div>
                   <div className="or wide">or</div>
-                  <div className="wide"><Btn kind="ghost" className="full" onClick={google}>{GOOGLE} Continue with Google</Btn></div>
+                  {social('Continue with')}
                 </>)}
               </AsyncForm>
             )}
@@ -228,7 +245,9 @@ export default function SignIn() {
                     <div className="roles">
                       <button type="button" className={"rolebtn" + (role === "donor" ? " on" : "")} onClick={() => setRole('donor')} aria-pressed={role === 'donor'}><i>01</i><b>Donor</b><span>Restaurant, hotel, canteen, event</span></button>
                       <button type="button" className={"rolebtn" + (role === "ngo" ? " on" : "")} onClick={() => setRole('ngo')} aria-pressed={role === 'ngo'}><i>02</i><b>Receiver</b><span>NGO, shelter, community kitchen</span></button>
-                    </div></div>
+                      <button type="button" className={"rolebtn" + (role === "rep" ? " on" : "")} onClick={() => setRole('rep')} aria-pressed={role === 'rep'}><i>03</i><b>Representative</b><span>Collect food for an NGO</span></button>
+                    </div>
+                    {role === 'rep' && <p className="note rep-note">Use the same email your NGO saved for you in their Representatives list. Your account links to them automatically.</p>}</div>
                   <Field label="Full name" wide><input name="name" autoComplete="name" placeholder="Your name" /></Field>
                   <Field label="Email" wide><input name="email" type="email" autoComplete="email" placeholder="you@organisation.org" /></Field>
                   <div className="wide"><PassField label="Password" name="password" autoComplete="new-password" placeholder="At least 8 characters" meter value={pw} onChange={(e) => setPw(e.target.value)} /></div>
@@ -236,7 +255,7 @@ export default function SignIn() {
                   <div className="wide"><Btn type="submit" busy={busy} className="full" arrow>Create account</Btn></div>
                   <div className="note wide">Organisations are reviewed by an admin before they can list or request food.</div>
                   <div className="or wide">or</div>
-                  <div className="wide"><Btn kind="ghost" className="full" onClick={google}>{GOOGLE} Sign up with Google</Btn></div>
+                  {social('Sign up with')}
                 </>)}
               </AsyncForm>
             )}

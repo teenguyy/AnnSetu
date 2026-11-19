@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { FiHome, FiShield, FiBriefcase, FiList, FiInbox, FiFlag, FiMail, FiEdit3, FiClipboard, FiEye, FiCheck, FiX, FiUsers, FiBox, FiHeart, FiTrendingUp, FiAlertTriangle, FiTrash2, FiPlus } from 'react-icons/fi';
+import { FiHome, FiShield, FiBriefcase, FiList, FiInbox, FiFlag, FiMail, FiEdit3, FiClipboard, FiEye, FiCheck, FiX, FiUsers, FiBox, FiHeart, FiTrendingUp, FiAlertTriangle, FiTrash2, FiPlus, FiCpu, FiAward, FiRefreshCw, FiStar, FiEyeOff } from 'react-icons/fi';
+import { api, apiReady } from './api.js';
 import { db, fmtDT, fmtD, tleft, DOC_TYPES } from './lib.js';
 import { need, loadNotes, markAllRead, subscribe } from './data.js';
 import { Shell, PageHead, Hero } from './shell.jsx';
 import { Btn, AsyncForm, Field, Card, Tag, Empty, Stat, Skeleton, Modal, useToast, useLoader, useHashTab } from './ui.jsx';
 
-const TABS = ['overview', 'verify', 'orgs', 'listings', 'requests', 'reports', 'inbox', 'content', 'audit'];
+const TABS = ['overview', 'verify', 'orgs', 'listings', 'requests', 'reports', 'leaderboard', 'inbox', 'content', 'audit'];
 const all = async (q) => need(await q) || [];
 /* SLA helper for no-certificate reviews (3-5 business days promised to the organisation). */
 function addBusinessDays(d, n) {
@@ -16,6 +17,15 @@ function addBusinessDays(d, n) {
 }
 
 async function loadAdmin(uid) {
+  const opt = async (q) => { const r = await q; return r.error ? [] : r.data || []; }; // features added in part 7
+  const [reviews, overrides, settings, lbDonor, lbNgo, snap] = await Promise.all([
+    opt(db.from('document_reviews').select('*').order('created_at', { ascending: false }).limit(300)),
+    opt(db.from('leaderboard_overrides').select('*')),
+    opt(db.from('app_settings').select('*')),
+    opt(db.rpc('public_leaderboard', { p_kind: 'donor' })),
+    opt(db.rpc('public_leaderboard', { p_kind: 'ngo' })),
+    db.rpc('latest_landing').then((r) => (r.error ? null : r.data)),
+  ]);
   const [orgs, docs, listings, requests, reports, contacts, faqs, testi, audit, profiles, notes] = await Promise.all([
     all(db.from('organizations').select('*').order('created_at', { ascending: false })),
     all(db.from('verification_documents').select('*').order('created_at', { ascending: false })),
@@ -31,7 +41,8 @@ async function loadAdmin(uid) {
   ]);
   const orgById = Object.fromEntries(orgs.map((o) => [o.id, o]));
   const prof = Object.fromEntries(profiles.map((p) => [p.id, p]));
-  return { orgs, docs, listings, requests, reports, contacts, faqs, testi, audit, notes, orgById, prof };
+  const pct = settings.find((x) => x.key === 'leaderboard_percent');
+  return { orgs, docs, listings, requests, reports, contacts, faqs, testi, audit, notes, orgById, prof, reviews, overrides, lbDonor, lbNgo, snap, percent: pct ? Number(pct.value) : 25 };
 }
 
 function ReasonModal({ title, label, cta, required = true, onSubmit, onClose }) {
@@ -52,6 +63,24 @@ function ReasonModal({ title, label, cta, required = true, onSubmit, onClose }) 
   );
 }
 
+const REC = { looks_valid: ['approved', 'Looks valid'], needs_review: ['pending', 'Needs a closer look'], likely_invalid: ['rejected', 'Likely invalid'] };
+function AIReview({ review }) {
+  if (!review) return null;
+  const [cls, label] = REC[review.recommendation] || ['', review.recommendation];
+  const ex = review.extracted || {};
+  const rows = [['Name', ex.organisation_name], ['Number', ex.registration_number], ['Type', ex.document_type && String(ex.document_type).replace(/_/g, ' ')],
+    ['Issued by', ex.issuing_authority], ['Valid until', ex.expiry_date], ['Address', ex.address]].filter((r) => r[1]);
+  return (
+    <div className="ai-rev">
+      <div className="ai-head"><FiCpu /><b>AI summary</b><Tag s={cls}>{label}</Tag>{review.confidence != null && <span className="ai-conf" title="Confidence"><i style={{ width: review.confidence + '%' }} />{review.confidence}/100</span>}</div>
+      <p>{review.summary}</p>
+      {rows.length > 0 && <dl className="ai-fields">{rows.map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}</dl>}
+      {(review.checks || []).length > 0 && <ul className="ai-checks">{review.checks.map((c, i) => <li key={i} className={c.result}><b>{c.check}</b> {c.detail}</li>)}</ul>}
+      <small className="m">{review.model ? 'Model ' + review.model + ' · ' : ''}{fmtDT(review.created_at)} · AI never approves: you decide.</small>
+    </div>
+  );
+}
+
 export default function Admin({ me }) {
   const uid = me.user.id;
   const toast = useToast();
@@ -67,7 +96,10 @@ export default function Admin({ me }) {
 
   if (error) return <div className="fatal"><h1>Couldn’t load the admin console</h1><p>{error.message}</p><button className="btn primary" onClick={refresh}>Try again</button></div>;
   if (!data) return <div className="boot"><Skeleton /></div>;
-  const { orgs, docs, listings, requests, reports, contacts, faqs, testi, audit, notes, orgById, prof } = data;
+  const { orgs, docs, listings, requests, reports, contacts, faqs, testi, audit, notes, orgById, prof, reviews, overrides, lbDonor, lbNgo, snap, percent } = data;
+  const latestFor = (pred) => reviews.find(pred) || null;
+  const runAI = (path, body, msg) => async () => { await api(path, body); toast(msg); await refresh(); };
+  const aiHint = apiReady() ? undefined : 'Connect the AnnSetu AI service (ANNSETU_API_URL) to enable this';
   const nm = (id) => orgById[id]?.name || '(removed)';
   const pend = orgs.filter((o) => o.verification === 'pending').sort((a, b) => (b.no_certificate ? 1 : 0) - (a.no_certificate ? 1 : 0));
   const openRep = reports.filter((r) => ['open', 'reviewing'].includes(r.status));
@@ -81,6 +113,7 @@ export default function Admin({ me }) {
     { id: 'listings', label: 'Listings', icon: <FiList /> },
     { id: 'requests', label: 'Requests', icon: <FiInbox /> },
     { id: 'reports', label: 'Reports', icon: <FiFlag />, badge: openRep.length || null },
+    { id: 'leaderboard', label: 'Leaderboard', icon: <FiAward /> },
     { id: 'inbox', label: 'Inbox', icon: <FiMail />, badge: newMsgs.length || null },
     { id: 'content', label: 'Content', icon: <FiEdit3 /> },
     { id: 'audit', label: 'Audit log', icon: <FiClipboard /> },
@@ -112,6 +145,8 @@ export default function Admin({ me }) {
             <span className="m">Requested {fmtD(o.no_certificate_requested_at)} · reply due by {fmtD(addBusinessDays(o.no_certificate_requested_at, 5))}{new Date() > addBusinessDays(o.no_certificate_requested_at, 5) ? ' · OVERDUE' : ''}</span>
             <p>{o.no_certificate_note}</p>
             <small className="m">Approving is allowed without an approved document for this organisation. Check the explanation and any “Other proof” files.</small>
+            <AIReview review={latestFor((r) => r.org_id === o.id && r.kind === 'no_certificate')} />
+            <div className="acts"><Btn size="sm" kind="ghost" disabled={!apiReady()} title={aiHint} onClick={runAI('/ai/review-no-cert', { org_id: o.id }, 'AI summary ready')}><FiCpu /> {latestFor((r) => r.org_id === o.id && r.kind === 'no_certificate') ? 'Re-run AI summary' : 'AI summary'}</Btn></div>
           </div>
         )}
         <div className="docs">
@@ -122,6 +157,8 @@ export default function Admin({ me }) {
               <Btn size="sm" kind="ghost" onClick={() => viewDoc(d)}>Open</Btn>
               {d.status !== 'approved' && <Btn size="sm" kind="ok" onClick={rpc('review_document', { p_doc: d.id, p_status: 'approved', p_note: null }, 'Document approved')}><FiCheck /></Btn>}
               {d.status !== 'rejected' && <Btn size="sm" kind="danger" onClick={() => setModal({ title: 'Reject document', label: 'Why is this document rejected?', cta: 'Reject document', run: async (r) => { need(await db.rpc('review_document', { p_doc: d.id, p_status: 'rejected', p_note: r })); toast('Document rejected'); await refresh(); } })}><FiX /></Btn>}
+              <Btn size="sm" kind="ghost" disabled={!apiReady()} title={aiHint} onClick={runAI('/ai/review-document', { document_id: d.id }, 'AI check complete')}><FiCpu /> {latestFor((r) => r.document_id === d.id) ? 'Re-check' : 'AI check'}</Btn>
+              <div className="doc-ai"><AIReview review={latestFor((r) => r.document_id === d.id)} /></div>
             </div>
           )) : <div className="m">No documents uploaded.</div>}
         </div>
@@ -217,9 +254,32 @@ export default function Admin({ me }) {
                 {r.status === 'open' && <Btn size="sm" kind="ghost" onClick={rpc('resolve_report', { p_report: r.id, p_status: 'reviewing', p_note: null, p_suspend: false }, 'Marked as reviewing')}>Start review</Btn>}
                 <Btn size="sm" kind="ok" onClick={() => setModal({ title: 'Resolve report', label: 'What did you decide? (sent to the reporter)', cta: 'Resolve', danger: false, run: async (n) => { need(await db.rpc('resolve_report', { p_report: r.id, p_status: 'resolved', p_note: n, p_suspend: false })); toast('Report resolved'); await refresh(); } })}>Resolve</Btn>
                 <Btn size="sm" kind="danger" onClick={() => setModal({ title: `Resolve and suspend ${nm(r.reported_org)}`, label: 'Reason (shown to the suspended organisation)', cta: 'Resolve and suspend', run: async (n) => { need(await db.rpc('resolve_report', { p_report: r.id, p_status: 'resolved', p_note: n, p_suspend: true })); toast('Report resolved and account suspended'); await refresh(); } })}>Resolve + suspend</Btn>
+                <Btn size="sm" kind="ghost" onClick={() => setModal({ title: `Warn ${nm(r.reported_org)}`, label: 'Warning message (sent to the reported organisation)', cta: 'Send warning', run: async (n) => { need(await db.rpc('admin_warn_org', { p_report: r.id, p_message: n })); toast('Warning sent'); await refresh(); } })}><FiAlertTriangle /> Warn</Btn>
                 <Btn size="sm" kind="ghost" onClick={() => setModal({ title: 'Dismiss report', label: 'Why is it dismissed?', cta: 'Dismiss', run: async (n) => { need(await db.rpc('resolve_report', { p_report: r.id, p_status: 'dismissed', p_note: n, p_suspend: false })); toast('Report dismissed'); await refresh(); } })}>Dismiss</Btn>
               </div>)}
           </Card>)) : <Empty>No reports. Great news.</Empty>}</>)}
+
+      {tab === 'leaderboard' && (<><PageHead kicker="Recognition" title="Leaderboard" sub={`Everyone sees the top ${percent}% of donors and receivers by food shared. Curate with a reason; every change is audited.`} />
+        <Card className="lb-settings">
+          <AsyncForm onSubmit={async (fd) => { const v = Math.round(+fd.get('pct')); if (!(v >= 5 && v <= 100)) throw new Error('Choose a percentage between 5 and 100.'); need(await db.rpc('admin_set_setting', { p_key: 'leaderboard_percent', p_value: v })); toast('Leaderboard size updated'); await refresh(); }}>
+            {({ busy }) => (<><Field label="Show the top (%)" hint="Between 20 and 30 is recommended."><input name="pct" type="number" min="5" max="100" defaultValue={percent} /></Field><div><Btn type="submit" busy={busy}>Save</Btn></div></>)}
+          </AsyncForm>
+          <div className="lb-snap"><b>Landing page numbers</b><span className="m">{snap && snap.taken_at ? 'Last refreshed ' + fmtDT(snap.taken_at) + ' · refreshes automatically every Monday' : 'Not refreshed yet'}</span>
+            <Btn size="sm" kind="ghost" onClick={rpc('admin_refresh_landing', {}, 'Landing numbers refreshed')}><FiRefreshCw /> Refresh now</Btn></div>
+        </Card>
+        {[['donor', 'Top donors', lbDonor], ['ngo', 'Top receivers', lbNgo]].map(([k, title, rows]) => (
+          <Card key={k}><h3>{title}</h3>
+            {rows.length ? rows.map((x) => (
+              <div key={x.org_id} className="ck lb-row"><span className="lb-rank">#{x.rank}</span><span style={{ flex: 1 }}><b>{x.name}</b> <span className="m">{x.org_type} · {x.pickups} pickups · {x.units} units</span>{x.curated && <Tag s="pending">{x.pinned ? 'pinned' : 'curated'}</Tag>}</span>
+                <Btn size="sm" kind="ghost" onClick={() => setModal({ title: `Pin ${x.name} to the top`, label: 'Reason (kept in the audit log)', cta: 'Pin', run: async (r) => { need(await db.rpc('admin_set_leaderboard', { p_org: x.org_id, p_action: 'pin', p_reason: r, p_boost: 0 })); toast('Pinned'); await refresh(); } })}><FiStar /> Pin</Btn>
+                <Btn size="sm" kind="ghost" onClick={() => setModal({ title: `Hide ${x.name}`, label: 'Reason (kept in the audit log)', cta: 'Hide', run: async (r) => { need(await db.rpc('admin_set_leaderboard', { p_org: x.org_id, p_action: 'hide', p_reason: r, p_boost: 0 })); toast('Hidden from the leaderboard'); await refresh(); } })}><FiEyeOff /> Hide</Btn>
+                {x.curated && <Btn size="sm" kind="ghost" onClick={rpc('admin_set_leaderboard', { p_org: x.org_id, p_action: 'clear', p_reason: 'cleared', p_boost: 0 }, 'Override removed')}>Clear</Btn>}
+              </div>)) : <Empty>No completed pickups yet, so nobody is ranked.</Empty>}
+          </Card>))}
+        {overrides.filter((o) => o.action === 'hide').length > 0 && <Card><h3>Hidden organisations</h3>{overrides.filter((o) => o.action === 'hide').map((o) => (
+          <div key={o.org_id} className="ck"><span style={{ flex: 1 }}><b>{nm(o.org_id)}</b> <span className="m">{o.reason} · by {prof[o.admin_id]?.full_name || 'Admin'}</span></span>
+            <Btn size="sm" kind="ghost" onClick={rpc('admin_set_leaderboard', { p_org: o.org_id, p_action: 'clear', p_reason: 'unhidden', p_boost: 0 }, 'Back on the leaderboard')}>Unhide</Btn></div>))}</Card>}
+      </>)}
 
       {tab === 'inbox' && (<><PageHead kicker="Website" title="Inbox" sub="Messages from the website contact form." />
         {contacts.length ? contacts.map((c, i) => (

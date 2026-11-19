@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FiSend, FiMapPin, FiUploadCloud, FiTrash2, FiAward, FiPrinter, FiShield, FiAlertTriangle, FiCheckCircle, FiClock, FiFileText } from 'react-icons/fi';
+import { FiSend, FiMapPin, FiUploadCloud, FiTrash2, FiAward, FiPrinter, FiShield, FiAlertTriangle, FiCheckCircle, FiClock, FiFileText, FiNavigation, FiTruck, FiPhone, FiExternalLink } from 'react-icons/fi';
 import { db, DONOR_TYPES, NGO_TYPES, DOC_TYPES, uploadTo, ago, fmtD, fmtDT } from './lib.js';
 import { need, saveOrg, orgDocs, loadMessages, sendMessage, fileReport, loadImpact } from './data.js';
 import { Btn, AsyncForm, Field, Card, Tag, Empty, Modal, Ring, Bar, Stat, useToast, useLoader, Skeleton } from './ui.jsx';
@@ -163,12 +163,12 @@ export function ImpactView({ org, kind, stats }) {
     {data.certs.length ? data.certs.map((c, i) => (
       <Card key={c.id} i={i} className="row"><div><h3>{c.title}</h3><span className="m">Issued {fmtD(c.issued_at)} · {c.serial}</span></div><Btn size="sm" kind="ghost" onClick={() => setCert(c)}><FiFileText /> View</Btn></Card>
     )) : <Empty>Certificates appear here when you earn a badge.</Empty>}
-    <h3 className="sec">Top {kind === 'donor' ? 'donors' : 'receivers'}</h3>
+    <h3 className="sec">Top {kind === 'donor' ? 'donors' : 'receivers'} <small className="m">(public leaderboard)</small></h3>
     {data.board.length ? (
       <Card className="board">
         {data.board.map((b, i) => (
           <div key={b.org_id} className={'brow' + (b.org_id === org.id ? ' me' : '')}>
-            <span className="rank">{i + 1}</span><b>{b.name}</b><span className="m">{b.donations} {kind === 'donor' ? 'donations' : 'pickups'}</span><span className="u">{b.units} units</span>
+            <span className="rank">{b.rank || i + 1}</span><b>{b.name}</b><span className="m">{b.pickups ?? b.donations} {kind === 'donor' ? 'donations' : 'pickups'}</span><span className="u">{b.units} units</span>
           </div>
         ))}
       </Card>
@@ -356,4 +356,102 @@ function NoCertificate({ org, hasDocs, onChanged }) {
       )}
     </div>
   );
+}
+
+
+/* ---------------- pickup tracking (status + ETA) ---------------- */
+const TRIP = { assigned: 'Representative assigned', on_the_way: 'On the way', arrived: 'Arrived at pickup', collected: 'Collected' };
+const TRIP_STEPS = ['assigned', 'on_the_way', 'arrived'];
+export const mapsLink = (o) => {
+  if (!o) return null;
+  const q = o.lat != null && o.lng != null ? `${o.lat},${o.lng}` : (o.address || '');
+  return q ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}` : null;
+};
+export function TripStatus({ request, canUpdate, onChanged }) {
+  const toast = useToast();
+  const [mins, setMins] = useState(20);
+  const st = request.trip_status || 'assigned';
+  const idx = TRIP_STEPS.indexOf(st);
+  const set = (status) => async () => {
+    const eta = status === 'on_the_way' ? new Date(Date.now() + mins * 6e4).toISOString() : null;
+    const r = await db.rpc('set_trip_status', { p_request: request.id, p_status: status, p_eta: eta });
+    if (r.error) { toast(r.error.message, 'bad'); return; }
+    toast(status === 'on_the_way' ? 'Donor and NGO notified: on the way.' : 'Donor and NGO notified: arrived.');
+    if (onChanged) await onChanged();
+  };
+  return (
+    <div className="trip" aria-label="Pickup progress">
+      <ol className="trip-steps">
+        {TRIP_STEPS.map((k, i) => <li key={k} className={i < idx ? 'done' : i === idx ? 'now' : ''}><i />{TRIP[k]}</li>)}
+      </ol>
+      <div className="trip-eta"><FiTruck />
+        {st === 'on_the_way' && request.eta ? <span>ETA <b>{new Date(request.eta).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</b></span>
+          : st === 'arrived' ? <span>The representative is at the pickup point.</span>
+          : <span>Waiting for the representative to start the trip.</span>}
+        {request.trip_updated_at && <small className="m"> · updated {ago(new Date(request.trip_updated_at).getTime())}</small>}
+      </div>
+      {canUpdate && (
+        <div className="acts trip-acts">
+          {st !== 'arrived' && (<>
+            <select className="mini" value={mins} onChange={(e) => setMins(+e.target.value)} aria-label="Minutes until arrival">
+              {[10, 20, 30, 45, 60, 90].map((m) => <option key={m} value={m}>{m} min</option>)}
+            </select>
+            <Btn size="sm" onClick={set('on_the_way')}><FiNavigation /> {st === 'on_the_way' ? 'Update ETA' : 'On the way'}</Btn>
+          </>)}
+          {st === 'on_the_way' && <Btn size="sm" kind="ghost" onClick={set('arrived')}><FiMapPin /> I’ve arrived</Btn>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- live location sharing during a pickup ---------------- */
+export function LocationShare({ request, who = 'your representative' }) {
+  const toast = useToast();
+  const [on, setOn] = useState(false);
+  const [last, setLast] = useState(null);
+  const watch = useRef(null);
+  const lastSent = useRef(0);
+  const stop = () => { if (watch.current != null) navigator.geolocation.clearWatch(watch.current); watch.current = null; };
+  useEffect(() => stop, []);
+  const toggle = () => {
+    if (on) { stop(); setOn(false); return; }
+    if (!navigator.geolocation) { toast('Your device can’t share location.', 'bad'); return; }
+    watch.current = navigator.geolocation.watchPosition(async (p) => {
+      if (Date.now() - lastSent.current < 5000) return;
+      lastSent.current = Date.now();
+      const r = await db.rpc('update_location', { p_request: request.id, p_lat: +p.coords.latitude.toFixed(6), p_lng: +p.coords.longitude.toFixed(6), p_acc: Math.round(p.coords.accuracy || 0) });
+      if (r.error) { toast(r.error.message, 'bad'); stop(); setOn(false); } else setLast(new Date());
+    }, () => { toast('Location permission was denied.', 'bad'); stop(); setOn(false); }, { enableHighAccuracy: true, maximumAge: 4000, timeout: 15000 });
+    setOn(true);
+  };
+  return (
+    <div className="loc"><FiNavigation />
+      <span>{on ? `Sharing live location with the donor${last ? ' · updated ' + last.toLocaleTimeString() : '…'}` : `Let the donor see ${who} on the way (optional)`}</span>
+      <button className={'switch' + (on ? ' on' : '')} role="switch" aria-checked={on} aria-label="Share live location" onClick={toggle}><i /></button>
+    </div>
+  );
+}
+
+/* Donor side: where is the representative? (live location, read-only) */
+export function RepLocation({ requestId }) {
+  const [loc, setLoc] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => { const r = await db.from('rep_locations').select('lat,lng,updated_at').eq('request_id', requestId).maybeSingle(); if (alive && !r.error) setLoc(r.data); };
+    load();
+    const t = setInterval(load, 10000);
+    return () => { alive = false; clearInterval(t); };
+  }, [requestId]);
+  if (!loc) return null;
+  return (
+    <a className="loc live" href={`https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`} target="_blank" rel="noopener noreferrer">
+      <FiNavigation /><span>Representative’s live location · {ago(new Date(loc.updated_at).getTime())}</span><FiExternalLink />
+    </a>
+  );
+}
+
+export function CallLink({ phone, label }) {
+  if (!phone) return null;
+  return <a className="btn ghost sm" href={'tel:' + String(phone).replace(/[^+\d]/g, '')}><FiPhone /> {label || 'Call'}</a>;
 }

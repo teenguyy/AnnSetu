@@ -10,7 +10,8 @@ import { Logo } from './brand.jsx';
 import { initCursor } from './cursor.js';
 import { useGsap, revealAll, ScrollTrigger } from './anim.js';
 import Hero from './home/Hero.jsx';
-import { Story, Mission, Journey, HomeDiscover, Experiences, Impact, Stories, Join, Footer } from './home/Sections.jsx';
+import { Story, Mission, Journey, HomeDiscover, Experiences, Impact, Leaderboard, AppAbout, Stories, Join, Footer } from './home/Sections.jsx';
+import Chatbot from './Chatbot.jsx';
 
 initTheme();
 initCursor();
@@ -157,10 +158,13 @@ function Home() {
         <HomeDiscover session={session} />
         <Experiences />
         <Impact />
+        <Leaderboard />
         <Stories />
+        <AppAbout />
         <Join session={session} />
       </main>
       <Footer />
+      <Chatbot />
     </div>
   );
 }

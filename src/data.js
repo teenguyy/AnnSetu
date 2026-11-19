@@ -98,7 +98,7 @@ export async function loadImpact(orgId, kind) {
     db.from('badge_definitions').select('*').eq('applies_to', kind).order('threshold'),
     db.from('org_badges').select('*').eq('org_id', orgId),
     db.from('certificates').select('*').eq('org_id', orgId).order('issued_at', { ascending: false }),
-    db.rpc('get_leaderboard', { p_kind: kind, p_limit: 10 }),
+    db.rpc('public_leaderboard', { p_kind: kind }),
   ]);
   return { defs: need(defs) || [], earned: new Set((need(earned) || []).map((b) => b.badge_code)), certs: need(certs) || [], board: need(board) || [] };
 }

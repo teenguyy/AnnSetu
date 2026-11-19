@@ -1,0 +1,21 @@
+# Render Blueprint for the AnnSetu FastAPI backend (free plan works for demos).
+services:
+  - type: web
+    name: annsetu-api
+    runtime: docker
+    rootDir: backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        value: https://wwnkyukqiibbzqqbfsxp.supabase.co
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-flash-latest
+      - key: GEMINI_FALLBACK_MODEL
+        value: gemini-3.1-flash-lite
+      - key: ALLOWED_ORIGINS
+        value: https://annsetu-inky.vercel.app,http://localhost:8080

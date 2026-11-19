@@ -4,7 +4,7 @@ import { db, CATEGORIES, uploadTo, toLocalInput, fmtDT, tleft, ago } from './lib
 import { need, loadDonor, subscribe, markAllRead } from './data.js';
 import { Shell, PageHead, Hero } from './shell.jsx';
 import { Btn, AsyncForm, Field, Card, Tag, Empty, Bar, Stat, Skeleton, useToast, useLoader, useHashTab, confetti } from './ui.jsx';
-import { VerifyBanner, canAct, profileComplete, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity } from './shared.jsx';
+import { VerifyBanner, canAct, profileComplete, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity, TripStatus, CallLink } from './shared.jsx';
 
 const TABS = ['overview', 'listings', 'requests', 'pickups', 'impact', 'profile'];
 const lstatus = (l) => (l.status === 'active' && new Date(l.pickup_by) < new Date() ? 'expired' : l.status);
@@ -194,6 +194,7 @@ function PickupCard({ r, i, loc, onConfirm, onChat }) {
   return (
     <Card i={i}>
       <div className="row"><div><h3>{r.ngo.name}</h3><span className="m">{r.quantity} × {r.listing?.title} · rep: {r.rep_name || '—'}{r.rep_phone ? ` (${r.rep_phone})` : ''}</span></div><Tag s="accepted" /></div>
+      <TripStatus request={r} />
       {loc && (
         <div className="loc"><FiNavigation /><span>Representative location updated {ago(new Date(loc.updated_at).getTime())}</span>
           <a className="lk" target="_blank" rel="noopener noreferrer" href={`https://www.openstreetmap.org/?mlat=${loc.lat}&mlon=${loc.lng}#map=16/${loc.lat}/${loc.lng}`}>Open map</a></div>
@@ -202,6 +203,7 @@ function PickupCard({ r, i, loc, onConfirm, onChat }) {
         <input className="otp" value={otp} inputMode="numeric" maxLength={4} placeholder="4-digit OTP" aria-label="Pickup OTP" onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} />
         <Btn size="sm" onClick={onConfirm(r, () => otp)}>Confirm collection</Btn>
         <Btn size="sm" kind="ghost" onClick={onChat}><FiMessageSquare /> Message</Btn>
+        <CallLink phone={r.rep_phone} label="Call representative" />
       </div>
     </Card>
   );

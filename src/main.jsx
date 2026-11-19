@@ -7,12 +7,14 @@ import SignIn from './SignIn.jsx';
 import Donor from './Donor.jsx';
 import Receiver from './Receiver.jsx';
 import Admin from './Admin.jsx';
+import Rep from './Rep.jsx';
+import Chatbot from './Chatbot.jsx';
 import { initCursor } from './cursor.js';
 import { Monogram } from './brand.jsx';
 
 initTheme();
 initCursor();
-const page = document.documentElement.dataset.page; // signin | donor | ngo | admin
+const page = document.documentElement.dataset.page; // signin | donor | ngo | admin | rep
 const root = createRoot(document.getElementById('root'));
 
 function Fatal({ title, text }) {
@@ -37,7 +39,7 @@ function Guard({ role }) {
   }, []);
   if (state.s === 'load') return <div className="boot"><Skeleton /></div>;
   if (state.s === 'err') return <Fatal title="We couldn’t verify your account" text={state.m} />;
-  const P = role === 'donor' ? Donor : role === 'ngo' ? Receiver : Admin;
+  const P = role === 'donor' ? Donor : role === 'ngo' ? Receiver : role === 'rep' ? Rep : Admin;
   return <P me={state.me} />;
 }
 
@@ -45,5 +47,6 @@ root.render(
   <ToastProvider>
     {!configured ? <Fatal title="AnnSetu is temporarily unavailable" text="Secure backend configuration is missing. Check supabase-config.js and your internet connection." />
       : page === 'signin' ? <SignIn /> : <Guard role={page} />}
+    {configured && <Chatbot />}
   </ToastProvider>
 );

@@ -5,7 +5,7 @@ import { need, loadReceiver, loadDiscover, subscribe, markAllRead } from './data
 import { Shell, PageHead, Hero } from './shell.jsx';
 import { Btn, AsyncForm, Field, Card, Tag, Empty, Bar, Stat, Skeleton, useToast, useLoader, useHashTab } from './ui.jsx';
 import { DiscoverBoard } from './discover.jsx';
-import { VerifyBanner, canAct, profileComplete, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity } from './shared.jsx';
+import { VerifyBanner, canAct, profileComplete, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity, TripStatus, LocationShare, CallLink, mapsLink } from './shared.jsx';
 
 const TABS = ['overview', 'discover', 'requests', 'pickups', 'needs', 'impact', 'profile'];
 
@@ -87,8 +87,9 @@ export default function Receiver({ me }) {
       <Card key={r.id} i={i}>
         <div className="row"><div><h3>{r.listing?.title}</h3><span className="m">{r.donor?.name} · {r.donor?.address || 'address on request'} · collect {r.quantity} · rep: {r.rep_name}</span></div><Tag s="accepted" /></div>
         <div className="otpbox"><span className="m">Pickup OTP, show it to the donor</span><div className="otpv">{otps[r.id]?.otp || '····'}</div>{otps[r.id] && <small className="m">Valid until {fmtDT(otps[r.id].expires_at)}</small>}</div>
+        <TripStatus request={r} canUpdate onChanged={refresh} />
         <LocationShare request={r} />
-        <div className="acts"><Btn size="sm" kind="ghost" onClick={() => setChat(r)}><FiMessageSquare /> Message</Btn><Btn size="sm" kind="danger" onClick={cancel(r)}>Cancel pickup</Btn></div>
+        <div className="acts"><Btn size="sm" kind="ghost" onClick={() => setChat(r)}><FiMessageSquare /> Message</Btn><CallLink phone={r.donor?.phone} label="Call donor" />{mapsLink(r.donor) && <a className="btn ghost sm" href={mapsLink(r.donor)} target="_blank" rel="noopener noreferrer"><FiNavigation /> Directions</a>}<Btn size="sm" kind="danger" onClick={cancel(r)}>Cancel pickup</Btn></div>
       </Card>
     ))}
   </>);
@@ -132,20 +133,24 @@ export default function Receiver({ me }) {
       <h3><FiUsers style={{ verticalAlign: '-2px' }} /> Pickup representatives</h3>
       <p className="m">Your own people collect food. AnnSetu does not provide delivery.</p>
       {reps.map((r) => (
-        <div key={r.id} className="ck"><span style={{ flex: 1 }}><b>{r.name}</b> <span className="m">{r.phone}</span></span>
+        <div key={r.id} className="ck rep-row"><span style={{ flex: 1 }}><b>{r.name}</b> <span className="m">{r.phone}{r.email ? ' · ' + r.email : ''}</span>
+          {r.email ? <Tag s={r.user_id ? 'approved' : 'pending'}>{r.user_id ? 'Account linked' : 'Can sign up as representative'}</Tag> : null}
+          <small className="m"> · {requests.filter((q) => q.rep_id === r.id && q.status === 'completed').length} pickups done</small></span>
           <Btn size="sm" kind="danger" onClick={async () => { need(await db.from('representatives').delete().eq('id', r.id)); toast('Representative removed.'); await refresh(); }}>Remove</Btn></div>
       ))}
       {!reps.length && <div className="m" style={{ margin: '10px 0' }}>No representatives yet.</div>}
       <AsyncForm className="mt" onSubmit={async (fd, form) => {
-        const name = String(fd.get('name')).trim(), phone = String(fd.get('phone')).trim();
+        const name = String(fd.get('name')).trim(), phone = String(fd.get('phone')).trim(), email = String(fd.get('email') || '').trim().toLowerCase();
         if (name.length < 2 || phone.length < 6) throw new Error('Enter the representative’s name and phone.');
+        if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Enter a valid email, or leave it empty.');
         if (!org) throw new Error('Save your organisation profile first.');
-        need(await db.from('representatives').insert({ org_id: org.id, name, phone }));
+        need(await db.from('representatives').insert({ org_id: org.id, name, phone, email: email || null }));
         form.reset(); toast('Representative added.'); await refresh();
       }}>
         {({ busy }) => (<>
           <Field label="Name"><input name="name" maxLength={60} /></Field>
           <Field label="Phone"><input name="phone" maxLength={20} inputMode="tel" /></Field>
+          <Field label="Email (optional)" wide hint="With an email, your representative can create a Representative account and see their pickups, directions and the OTP."><input name="email" type="email" maxLength={120} placeholder="rep@example.com" /></Field>
           <div className="wide"><Btn type="submit" busy={busy}>Add representative</Btn></div>
         </>)}
       </AsyncForm>
@@ -195,32 +200,4 @@ function Discover({ org, reps, ok, onRequested, setTab }) {
       lockReason="Your organisation must be verified and active before you can request food."
       controls={controls} onRequested={async () => { await onRequested(); await refresh(); }} />
   </>);
-}
-
-/* ---------- live location sharing during a pickup ---------- */
-function LocationShare({ request }) {
-  const toast = useToast();
-  const [on, setOn] = useState(false);
-  const [last, setLast] = useState(null);
-  const watch = useRef(null);
-  const lastSent = useRef(0);
-  const stop = () => { if (watch.current != null) navigator.geolocation.clearWatch(watch.current); watch.current = null; };
-  useEffect(() => stop, []);
-  const toggle = () => {
-    if (on) { stop(); setOn(false); return; }
-    if (!navigator.geolocation) { toast('Your device can’t share location.', 'bad'); return; }
-    watch.current = navigator.geolocation.watchPosition(async (p) => {
-      if (Date.now() - lastSent.current < 5000) return;
-      lastSent.current = Date.now();
-      const r = await db.rpc('update_location', { p_request: request.id, p_lat: +p.coords.latitude.toFixed(6), p_lng: +p.coords.longitude.toFixed(6), p_acc: Math.round(p.coords.accuracy || 0) });
-      if (r.error) { toast(r.error.message, 'bad'); stop(); setOn(false); } else setLast(new Date());
-    }, () => { toast('Location permission was denied.', 'bad'); stop(); setOn(false); }, { enableHighAccuracy: true, maximumAge: 4000, timeout: 15000 });
-    setOn(true);
-  };
-  return (
-    <div className="loc"><FiNavigation />
-      <span>{on ? `Sharing live location with the donor${last ? ' · updated ' + last.toLocaleTimeString() : '…'}` : 'Let the donor see your representative on the way (optional)'}</span>
-      <button className={'switch' + (on ? ' on' : '')} role="switch" aria-checked={on} aria-label="Share live location" onClick={toggle}><i /></button>
-    </div>
-  );
 }
