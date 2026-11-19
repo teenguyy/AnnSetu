@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs every migration, the seed and all SQL tests against a fresh local database.
-# Requires Postgres 16+ with PostGIS, pgvector and pgcrypto. Usage: supabase/tests/run.sh
+# Requires Postgres 16+ with PostGIS, pgvector and pgcrypto.
+# Usage: supabase/tests/run.sh [--schema-only]   (TEST_DB=name to choose the database)
 set -euo pipefail
 shopt -s nullglob
 cd "$(dirname "$0")/.."
@@ -22,6 +23,7 @@ apply tests/00_supabase_shim.sql
 for f in migrations/*.sql; do apply "$f"; done
 apply seed.sql
 apply tests/01_helpers.sql
+if [ "${1:-}" = "--schema-only" ]; then echo "schema ready in $DB"; exit 0; fi
 
 pass=0; fail=0
 for t in tests/[1-9][0-9]_*.sql; do
