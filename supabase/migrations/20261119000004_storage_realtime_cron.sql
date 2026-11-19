@@ -11,7 +11,8 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
   ('chat-attachments', 'chat-attachments', false, 2097152, array['image/jpeg', 'image/png', 'image/webp']),
   ('certificates', 'certificates', false, 10485760, array['application/pdf']),
   ('app-assets', 'app-assets', true, 104857600, null)
-on conflict (id) do nothing;
+on conflict (id) do update
+  set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
 -- public buckets: anyone reads; owners write into their own folder
 create policy "public buckets readable" on storage.objects for select to anon, authenticated
@@ -71,9 +72,14 @@ begin
 end $$;
 
 -- ───────────────────────── scheduled jobs ─────────────────────────
--- pg_cron is enabled per project in Supabase (Database → Extensions). Skipped where unavailable.
+-- pg_cron needs shared_preload_libraries (enabled on Supabase). Skipped where unavailable.
 do $$
 begin
+  begin
+    create extension if not exists pg_cron;
+  exception when others then
+    raise notice 'pg_cron unavailable here: %', sqlerrm;
+  end;
   if exists (select 1 from pg_extension where extname = 'pg_cron') then
     perform cron.schedule('annsetu-expire-listings', '*/10 * * * *', 'select public.expire_listings()');
     perform cron.schedule('annsetu-landing-snapshot', '17 3 * * 1', 'select public.rebuild_landing_snapshot()');

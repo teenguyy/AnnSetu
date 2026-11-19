@@ -46,7 +46,9 @@ insert into public.app_settings (key, value, is_public) values
   ('meal_method', to_jsonb('portions + kg ÷ 0.42 (WRAP 420 g meal equivalent); packs are not converted'::text), true)
 on conflict (key) do nothing;
 
-insert into public.faqs (question, answer, category, sort) values
+-- FAQs only on a fresh database (an upgraded project keeps its own FAQs; see 20261119000005)
+insert into public.faqs (question, answer, category, sort)
+select * from (values
   ('Does AnnSetu deliver food?',
    'No. AnnSetu is a bridge, not a delivery fleet. Verified receivers send their own representatives to collect food from donors.', 'general', 10),
   ('Who can donate?',
@@ -60,7 +62,9 @@ insert into public.faqs (question, answer, category, sort) values
   ('How do you calculate meals and CO₂?',
    'Only OTP-confirmed pickups count. Meals are estimated as portions plus kilograms ÷ 0.42 (WRAP''s 420 g meal equivalent); packs are not converted. CO₂ is kilograms × a cited emissions factor. Estimates are always labelled "est.".', 'impact', 60),
   ('Is my data private?',
-   'Contact details and documents are visible only to verified partners in a pickup and to AnnSetu admins. See the privacy page for details.', 'general', 70);
+   'Contact details and documents are visible only to verified partners in a pickup and to AnnSetu admins. See the privacy page for details.', 'general', 70)
+) as v(question, answer, category, sort)
+where not exists (select 1 from public.faqs);
 
 -- first snapshot so the landing page has a real (possibly zero) baseline
 select public.rebuild_landing_snapshot();
