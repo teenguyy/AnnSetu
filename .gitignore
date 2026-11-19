@@ -1,0 +1,35 @@
+# env
+.env
+.env.*
+!.env.example
+
+# node / next
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# supabase
+supabase/.branches/
+supabase/.temp/
+
+# test output
+playwright-report/
+test-results/
+coverage/
+
+# flutter
+mobile/.dart_tool/
+mobile/build/
+
+# os
+.DS_Store
