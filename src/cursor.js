@@ -39,6 +39,7 @@ function mount(reduce) {
   el.innerHTML = `
     <span class="cx-dot"></span>
     <svg class="cx-hair" viewBox="-32 -32 64 64" width="64" height="64">
+      <circle class="cx-ring" r="18"/>
       <g class="cx-links"><path d="M-13 -13 L13 -13 L13 13 L-13 13 Z"/></g>
       <g class="cx-arms"><path d="M0 -7 V-17"/><path d="M7 0 H17"/><path d="M0 7 V17"/><path d="M-7 0 H-17"/></g>
       <g class="cx-nodes"><circle cx="-13" cy="-13" r="2.4"/><circle cx="13" cy="-13" r="2.4"/><circle cx="13" cy="13" r="2.4"/><circle cx="-13" cy="13" r="2.4"/></g>
@@ -59,12 +60,18 @@ function mount(reduce) {
 
   let x = -100, y = -100, hx = x, hy = y, vx = 0, vy = 0, angle = 0;
   let raf = 0, visible = false, mode = '';
+  let magnet = null; // element the ring gently pulls towards
   const pts = [];
 
   const tick = () => {
     const still = reduce.matches;
     const k = still ? 1 : 0.24;
-    hx += (x - hx) * k; hy += (y - hy) * k;
+    let tx = x, ty = y;
+    if (magnet && !still) {
+      const r = magnet.getBoundingClientRect();
+      tx = x + (r.left + r.width / 2 - x) * 0.18; ty = y + (r.top + r.height / 2 - y) * 0.18; // 2-4 px pull on typical buttons
+    }
+    hx += (tx - hx) * k; hy += (ty - hy) * k;
     dot.style.transform = `translate3d(${x}px,${y}px,0)`;
     hair.style.transform = `translate3d(${hx - 32}px,${hy - 32}px,0)`;
     const sp = Math.hypot(vx, vy);
@@ -86,7 +93,7 @@ function mount(reduce) {
         ctx.stroke();
       }
     } else pts.length = 0;
-    const settled = Math.abs(x - hx) < 0.1 && Math.abs(y - hy) < 0.1 && sp < 0.05;
+    const settled = Math.abs(tx - hx) < 0.1 && Math.abs(ty - hy) < 0.1 && sp < 0.05;
     if (settled && pts.length) pts.shift();
     raf = settled && !pts.length ? 0 : requestAnimationFrame(tick);
   };
@@ -106,7 +113,10 @@ function mount(reduce) {
     setCls('is-text', !!t.closest(TEXT));
     setCls('on-dark', document.documentElement.dataset.theme === 'dark' || !!t.closest('[data-dark]'));
     setCls('is-grab', !!t.closest(GRAB));
-    setCls('is-hover', !!t.closest(HOVER) || !!t.closest(GRAB));
+    const h = t.closest(HOVER) || t.closest(GRAB);
+    magnet = h && h.getBoundingClientRect().width < 260 ? h : null;
+    setCls('is-hover', !!h);
+    kick();
   };
   const onDown = (e) => { if (!e.pointerType || e.pointerType === 'mouse') setCls('is-down', true); };
   const onUp = () => setCls('is-down', false);

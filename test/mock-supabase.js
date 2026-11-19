@@ -68,13 +68,13 @@
     },
     review_org(a) {
       if (prof().role !== 'admin') return err('Admins only');
-      if (a.p_approve && !db.verification_documents.find((d) => d.org_id === a.p_org && d.status === 'approved')) return err('Approve at least one verification document first');
+      if (a.p_approve && !db.verification_documents.find((d) => d.org_id === a.p_org && d.status === 'approved') && !org(a.p_org).no_certificate) return err('Approve at least one verification document first');
       if (!a.p_approve && !(a.p_note || '').trim()) return err('A note is required when rejecting');
       const o = org(a.p_org); o.verification = a.p_approve ? 'approved' : 'rejected'; o.verification_note = a.p_note;
-      db.audit_log.push({ id: uuid(), action: a.p_approve ? 'org_approved' : 'org_rejected', target_table: 'organizations', details: { note: a.p_note }, created_at: now() });
+      db.audit_log.push({ id: uuid(), admin_id: uid(), action: a.p_approve ? 'org_approved' : 'org_rejected', target_table: 'organizations', details: { note: a.p_note }, created_at: now() });
       notify(o.id, a.p_approve ? 'Organisation verified' : 'Verification rejected', a.p_note); return { data: null, error: null };
     },
-    review_document(a) { const d = db.verification_documents.find((x) => x.id === a.p_doc); d.status = a.p_status; d.reviewer_note = a.p_note; db.audit_log.push({ id: uuid(), action: 'document_' + a.p_status, target_table: 'verification_documents', details: {}, created_at: now() }); return { data: null, error: null }; },
+    review_document(a) { const d = db.verification_documents.find((x) => x.id === a.p_doc); d.status = a.p_status; d.reviewer_note = a.p_note; db.audit_log.push({ id: uuid(), admin_id: uid(), action: 'document_' + a.p_status, target_table: 'verification_documents', details: {}, created_at: now() }); return { data: null, error: null }; },
     suspend_org(a) { const o = org(a.p_org); o.suspended = a.p_suspend; o.suspended_reason = a.p_reason; return { data: null, error: null }; },
     admin_withdraw_listing(a) { db.food_listings.find((l) => l.id === a.p_listing).status = 'withdrawn'; return { data: null, error: null }; },
     resolve_report(a) { const r = db.reports.find((x) => x.id === a.p_report); r.status = a.p_status; r.admin_note = a.p_note; return { data: null, error: null }; },
@@ -107,7 +107,16 @@
         if (t === 'reports') arr.forEach((r) => (r.status = 'open'));
         if (t === 'contact_messages') arr.forEach((c) => (c.status = 'new'));
         db[t].push(...arr); out = arr;
-      } else if (st.op === 'update') { out = filt(rows, st.fs); out.forEach((r) => Object.assign(r, st.payload)); }
+      } else if (st.op === 'update') {
+        out = filt(rows, st.fs);
+        out.forEach((r) => {
+          if (t === 'organizations' && 'no_certificate' in st.payload) { // mirrors trg_no_certificate
+            if (st.payload.no_certificate && !['NGO', 'Community group', 'Community kitchen'].includes(r.org_type)) throw new Error('Only NGOs, community groups and community kitchens can request review without a certificate');
+            st.payload.no_certificate_requested_at = st.payload.no_certificate ? now() : null;
+          }
+          Object.assign(r, st.payload);
+        });
+      }
       else if (st.op === 'delete') { const del = filt(rows, st.fs); db[t] = rows.filter((r) => !del.includes(r)); out = del; }
       else { out = filt(rows, st.fs).slice(); if (st.ord) out.sort((a, b) => (a[st.ord[0]] > b[st.ord[0]] ? 1 : -1) * (st.ord[1] ? 1 : -1)); if (st.lim) out = out.slice(0, st.lim); }
       save();

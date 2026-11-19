@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { FiSun, FiMoon, FiBell, FiLogOut, FiMenu, FiCheck, FiX } from 'react-icons/fi';
+import { FiSun, FiMoon, FiBell, FiLogOut, FiMenu, FiCheck, FiX, FiChevronsLeft, FiChevronsRight } from 'react-icons/fi';
 import { db, ago, setTheme, SIGNIN } from './lib.js';
-import { Avatar } from './ui.jsx';
+import { Avatar, Modal, Btn } from './ui.jsx';
 import { Logo as BrandLogo } from './brand.jsx';
 
 export function Logo({ light }) {
@@ -56,7 +56,10 @@ function Bell({ notes, onReadAll }) {
 
 export function Shell({ roleLabel, tabs, tab, setTab, title, org, user, notes, onReadAll, banner, children }) {
   const [menu, setMenu] = useState(false);
+  const [askOut, setAskOut] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('annsetu_nav_collapsed') === '1'; } catch (e) { return false; } });
   const reduce = useReducedMotion();
+  const toggleNav = () => setCollapsed((c) => { try { localStorage.setItem('annsetu_nav_collapsed', c ? '0' : '1'); } catch (e) {} return !c; });
   const signOut = async () => { await db.auth.signOut(); location.replace(SIGNIN); };
   const go = (id) => { setTab(id); setMenu(false); };
   useEffect(() => {
@@ -65,23 +68,22 @@ export function Shell({ roleLabel, tabs, tab, setTab, title, org, user, notes, o
     document.addEventListener('keydown', k);
     return () => document.removeEventListener('keydown', k);
   }, [menu]);
-  const idx = Math.max(0, tabs.findIndex((t) => t.id === tab));
   return (
-    <div className="shell">
+    <div className={'shell' + (collapsed ? ' collapsed' : '')}>
       <a className="skip" href="#main">Skip to content</a>
       <aside data-dark className={'side' + (menu ? ' open' : '')} aria-label={roleLabel + ' navigation'}>
         <div className="sidetop">
           <Logo light />
           <button className="ib menu-x" aria-label="Close menu" onClick={() => setMenu(false)}><FiX /></button>
+          <button className="ib nav-toggle" onClick={toggleNav} aria-label={collapsed ? 'Expand menu' : 'Collapse menu'} aria-pressed={collapsed} title={collapsed ? 'Expand menu' : 'Collapse menu'}>{collapsed ? <FiChevronsRight /> : <FiChevronsLeft />}</button>
         </div>
         <span className="siderole">{roleLabel}</span>
         <nav>
-          {tabs.map((t, i) => (
-            <button key={t.id} className={'nav' + (tab === t.id ? ' on' : '')} onClick={() => go(t.id)} aria-current={tab === t.id ? 'page' : undefined}>
+          {tabs.map((t) => (
+            <button key={t.id} className={'nav' + (tab === t.id ? ' on' : '')} onClick={() => go(t.id)} aria-current={tab === t.id ? 'page' : undefined} disabled={t.disabled} title={t.disabled ? 'Complete your profile first' : collapsed ? t.label : undefined} aria-label={t.badge ? `${t.label}, ${t.badge} new` : t.label}>
               {tab === t.id && (
                 <motion.span className="nav-ind" layoutId={'nav-ind-' + roleLabel} transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 520, damping: 40 }} />
               )}
-              <span className="nav-no" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
               <span className="ni-ic">{t.icon}</span><span className="nav-l">{t.label}</span>
               {t.badge ? <span className="badge">{t.badge}</span> : null}
             </button>
@@ -91,13 +93,14 @@ export function Shell({ roleLabel, tabs, tab, setTab, title, org, user, notes, o
           <Avatar name={org?.name || user.email} src={org?.logo} />
           <div className="whot"><b>{org?.name || (roleLabel === 'Admin console' ? 'Administrator' : 'Set up your profile')}</b><small>{user.email}</small></div>
         </div>
-        <button className="nav signout" onClick={signOut}><span className="ni-ic"><FiLogOut /></span><span>Sign out</span></button>
+        <button className="nav signout" onClick={() => setAskOut(true)} title={collapsed ? 'Sign out' : undefined}><span className="ni-ic"><FiLogOut /></span><span className="nav-l">Sign out</span></button>
       </aside>
       {menu && <div className="scrim" onClick={() => setMenu(false)} />}
       <main id="main" tabIndex={-1}>
+        <div className="ambient" aria-hidden="true"><i /><i /><i /><svg viewBox="0 0 1200 200" preserveAspectRatio="none"><path d="M0 120 C 200 60, 380 170, 600 110 S 1000 50, 1200 120" /></svg></div>
         <div className="tb">
           <button className="ib menu" aria-label="Menu" aria-expanded={menu} onClick={() => setMenu(true)}><FiMenu /></button>
-          <div className="tbt"><span className="tb-no" aria-hidden="true">{String(idx + 1).padStart(2, '0')} /</span> {title}</div>
+          <div className="tbt">{title}</div>
           <div className="tbr"><ThemeToggle /><Bell notes={notes} onReadAll={onReadAll} /><Avatar name={org?.name || user.email} src={org?.logo} /></div>
         </div>
         {banner}
@@ -111,6 +114,12 @@ export function Shell({ roleLabel, tabs, tab, setTab, title, org, user, notes, o
           </motion.div>
         </AnimatePresence>
       </main>
+      {askOut && (
+        <Modal title="Sign out of AnnSetu?" onClose={() => setAskOut(false)}>
+          <p className="m">You’ll need to sign in again to manage listings, requests and pickups.</p>
+          <div className="acts"><Btn kind="danger" onClick={signOut}>Sign out</Btn><Btn kind="ghost" onClick={() => setAskOut(false)}>Stay signed in</Btn></div>
+        </Modal>
+      )}
     </div>
   );
 }

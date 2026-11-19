@@ -7,6 +7,13 @@ import { Btn, AsyncForm, Field, Card, Tag, Empty, Stat, Skeleton, Modal, useToas
 
 const TABS = ['overview', 'verify', 'orgs', 'listings', 'requests', 'reports', 'inbox', 'content', 'audit'];
 const all = async (q) => need(await q) || [];
+/* SLA helper for no-certificate reviews (3-5 business days promised to the organisation). */
+function addBusinessDays(d, n) {
+  const x = new Date(d || Date.now());
+  let added = 0;
+  while (added < n) { x.setDate(x.getDate() + 1); if (x.getDay() !== 0 && x.getDay() !== 6) added++; }
+  return x;
+}
 
 async function loadAdmin(uid) {
   const [orgs, docs, listings, requests, reports, contacts, faqs, testi, audit, profiles, notes] = await Promise.all([
@@ -62,7 +69,7 @@ export default function Admin({ me }) {
   if (!data) return <div className="boot"><Skeleton /></div>;
   const { orgs, docs, listings, requests, reports, contacts, faqs, testi, audit, notes, orgById, prof } = data;
   const nm = (id) => orgById[id]?.name || '(removed)';
-  const pend = orgs.filter((o) => o.verification === 'pending');
+  const pend = orgs.filter((o) => o.verification === 'pending').sort((a, b) => (b.no_certificate ? 1 : 0) - (a.no_certificate ? 1 : 0));
   const openRep = reports.filter((r) => ['open', 'reviewing'].includes(r.status));
   const newMsgs = contacts.filter((c) => c.status === 'new');
   const done = requests.filter((r) => r.status === 'completed');
@@ -99,6 +106,14 @@ export default function Admin({ me }) {
         <div className="row"><div><h3>{o.name}</h3><span className="m">{o.kind === 'ngo' ? 'Receiver' : 'Donor'} · {o.org_type}{o.address ? ' · ' + o.address : ''}{owner?.full_name ? ' · contact: ' + owner.full_name : ''}{o.phone ? ' · ' + o.phone : ''}</span></div>
           <div className="chips"><Tag s={o.verification} />{o.suspended && <Tag s="rejected">suspended</Tag>}</div></div>
         {o.about && <p className="m" style={{ margin: '8px 0 0' }}>{o.about}</p>}
+        {o.no_certificate && (
+          <div className="nocert-admin">
+            <b>No certificate: manual review requested</b>
+            <span className="m">Requested {fmtD(o.no_certificate_requested_at)} · reply due by {fmtD(addBusinessDays(o.no_certificate_requested_at, 5))}{new Date() > addBusinessDays(o.no_certificate_requested_at, 5) ? ' · OVERDUE' : ''}</span>
+            <p>{o.no_certificate_note}</p>
+            <small className="m">Approving is allowed without an approved document for this organisation. Check the explanation and any “Other proof” files.</small>
+          </div>
+        )}
         <div className="docs">
           {od.length ? od.map((d) => (
             <div key={d.id} className="doc">
@@ -135,7 +150,7 @@ export default function Admin({ me }) {
     </div>
     {pend.length > 0 && <Card className="row"><div><h3>{pend.length} organisation{pend.length > 1 ? 's' : ''} waiting</h3><span className="m">They can’t list or request food until verified.</span></div><Btn onClick={() => setTab('verify')}>Review now</Btn></Card>}
     {openRep.length > 0 && <Card className="row"><div><h3>{openRep.length} open report{openRep.length > 1 ? 's' : ''}</h3><span className="m">Look into complaints raised by donors and NGOs.</span></div><Btn onClick={() => setTab('reports')}>Open reports</Btn></Card>}
-    {audit.length > 0 && <Card><h3>Recent decisions</h3>{audit.slice(0, 5).map((a) => <div key={a.id} className="ev"><span>{a.action.replace(/_/g, ' ')}{a.details?.note ? ': ' + a.details.note : ''}</span><small className="m">{fmtDT(a.created_at)}</small></div>)}</Card>}
+    {audit.length > 0 && <Card><h3>Recent decisions</h3>{audit.slice(0, 5).map((a) => <div key={a.id} className="ev"><span><b>{prof[a.admin_id]?.full_name || 'Admin'}</b> · {a.action.replace(/_/g, ' ')}{a.details?.note ? ': ' + a.details.note : ''}</span><small className="m">{fmtDT(a.created_at)}</small></div>)}</Card>}
   </>);
 
   const orgsList = orgs.filter((o) => (orgF === 'all' || (orgF === 'donors' && o.kind === 'donor') || (orgF === 'ngos' && o.kind === 'ngo') || (orgF === 'suspended' ? o.suspended : o.verification === orgF)) && (!q || (o.name + ' ' + o.org_type + ' ' + (o.address || '')).toLowerCase().includes(q.toLowerCase())));
@@ -239,10 +254,11 @@ export default function Admin({ me }) {
       {tab === 'audit' && (<><PageHead kicker="Accountability" title="Audit log" sub="Every admin decision is recorded here." />
         {audit.length ? (
           <div className="tbl-wrap rise"><table className="tbl">
-            <thead><tr><th scope="col">When</th><th scope="col">Action</th><th scope="col">Target</th><th scope="col">Note</th></tr></thead>
+            <thead><tr><th scope="col">When</th><th scope="col">By</th><th scope="col">Action</th><th scope="col">Target</th><th scope="col">Note</th></tr></thead>
             <tbody>{audit.map((a) => (
               <tr key={a.id}>
                 <td data-label="When" className="nowrap">{fmtDT(a.created_at)}</td>
+                <td data-label="By"><b>{prof[a.admin_id]?.full_name || (a.admin_id ? 'Admin (name not set)' : 'System')}</b></td>
                 <th scope="row" data-label="Action"><b className="cap1">{a.action.replace(/_/g, ' ')}</b></th>
                 <td data-label="Target">{a.target_table || '—'}</td>
                 <td data-label="Note">{a.details?.note || a.details?.reason || '—'}</td>

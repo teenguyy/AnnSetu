@@ -5,7 +5,7 @@ import { need, loadReceiver, loadDiscover, subscribe, markAllRead } from './data
 import { Shell, PageHead, Hero } from './shell.jsx';
 import { Btn, AsyncForm, Field, Card, Tag, Empty, Bar, Stat, Skeleton, useToast, useLoader, useHashTab } from './ui.jsx';
 import { DiscoverBoard } from './discover.jsx';
-import { VerifyBanner, canAct, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity } from './shared.jsx';
+import { VerifyBanner, canAct, profileComplete, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity } from './shared.jsx';
 
 const TABS = ['overview', 'discover', 'requests', 'pickups', 'needs', 'impact', 'profile'];
 
@@ -36,8 +36,10 @@ export default function Receiver({ me }) {
     { id: 'impact', label: 'Impact', icon: <FiAward /> },
     { id: 'profile', label: 'Profile', icon: <FiUser /> },
   ];
+  const locked = !profileComplete(org, 'ngo');
+  tabs.forEach((t) => { if (locked && t.id !== 'profile') t.disabled = true; });
   const titles = Object.fromEntries(tabs.map((t) => [t.id, t.label]));
-  const view = org ? tab : 'profile'; // no organisation yet: send them to the profile form
+  const view = profileComplete(org, 'ngo') ? tab : 'profile'; // profile completion is compulsory (documents can come later)
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const events = requests.map((r) => ({ t: <>Request for <b>{r.quantity}</b> of {r.listing?.title || 'food'}: {r.status}</>, at: r.created_at }));

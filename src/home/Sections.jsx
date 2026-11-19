@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { FiArrowRight, FiCheck, FiChevronDown } from 'react-icons/fi';
-import { gsap, ScrollTrigger, useGsap, countUp } from '../anim.js';
+import { gsap, useGsap, countUp } from '../anim.js';
 import { db, configured, EMAIL_RE, errMsg, fmtD, ROUTES, publicUrl } from '../lib.js';
 import { need, myOrg, loadDiscover } from '../data.js';
 import { Btn, AsyncForm, Field, Arrow, useToast } from '../ui.jsx';
@@ -81,32 +81,45 @@ const STEPS = [
 const ROUTE = 'M40 250 C 170 250, 190 80, 320 90 S 520 300, 620 250 S 790 60, 900 100 S 1060 260, 1160 200';
 export function Journey() {
   const ref = useRef(null);
+  const tlRef = useRef(null);
   const [active, setActive] = useState(0);
   const [pts, setPts] = useState([]);
+  const [playing, setPlaying] = useState(true);
   useEffect(() => {
     const p = ref.current && ref.current.querySelector('#jr-path');
     if (!p || !p.getTotalLength) return;
     const L = p.getTotalLength();
     setPts(STEPS.map((_, i) => { const q = p.getPointAtLength((L * i) / (STEPS.length - 1)); return [q.x, q.y]; }));
   }, []);
+  // Auto-play: when the section comes into view the route draws itself, the hot-food marker travels it,
+  // and the stops light up one by one, then it rests and loops. No scroll-pinning or scrubbing.
   useGsap(ref, (reduced) => {
-    const mm = gsap.matchMedia();
-    if (reduced) { setActive(STEPS.length - 1); return () => mm.revert(); }
-    mm.add('(min-width: 900px)', () => {
-      const tl = gsap.timeline({
-        scrollTrigger: { trigger: ref.current, start: 'top top', end: '+=1600', scrub: 0.6, pin: '.jr-pin',
-          onUpdate: (s) => setActive(Math.min(STEPS.length - 1, Math.floor(s.progress * (STEPS.length - 0.001)))) },
-      });
-      tl.fromTo('#jr-draw', { strokeDashoffset: 1 }, { strokeDashoffset: 0, ease: 'none', duration: 1 }, 0)
-        .fromTo('.jr-marker', { motionPath: { path: '#jr-path', align: '#jr-path', alignOrigin: [0.5, 0.5], end: 0 } },
-          { motionPath: { path: '#jr-path', align: '#jr-path', alignOrigin: [0.5, 0.5], end: 1 }, ease: 'none', duration: 1 }, 0);
-    });
-    mm.add('(max-width: 899px)', () => {
-      gsap.set('#jr-draw', { strokeDashoffset: 0 });
-      ScrollSteps(ref.current, setActive);
-    });
-    return () => mm.revert();
+    if (reduced) { setActive(STEPS.length - 1); gsap.set('#jr-draw', { strokeDashoffset: 0 }); return undefined; }
+    const n = STEPS.length - 1;
+    const tl = gsap.timeline({ paused: true, repeat: -1, repeatDelay: 2.2,
+      onRepeat: () => setActive(0),
+      onUpdate: () => { const pr = Math.min(1, tl.time() / 7); setActive(Math.min(n, Math.floor(pr * n + 0.02))); } });
+    tl.set('#jr-draw', { strokeDashoffset: 1 }, 0)
+      .to('#jr-draw', { strokeDashoffset: 0, duration: 7, ease: 'none' }, 0)
+      .fromTo('.jr-marker', { motionPath: { path: '#jr-path', align: '#jr-path', alignOrigin: [0.5, 0.5], autoRotate: false, end: 0 } },
+        { motionPath: { path: '#jr-path', align: '#jr-path', alignOrigin: [0.5, 0.5], autoRotate: false, end: 1 }, duration: 7, ease: 'none' }, 0)
+      .to({}, { duration: 1.2 });
+    tlRef.current = tl;
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting && tlRef.current?.userPlay !== false) tl.play(); else tl.pause(); }, { threshold: 0.35 });
+    io.observe(ref.current);
+    return () => { io.disconnect(); tlRef.current = null; };
   });
+  const toggle = () => {
+    const tl = tlRef.current;
+    if (!tl) return;
+    if (playing) { tl.pause(); tl.userPlay = false; } else { tl.userPlay = true; tl.play(); }
+    setPlaying(!playing);
+  };
+  const jump = (i) => {
+    const tl = tlRef.current;
+    setActive(i);
+    if (tl) { tl.pause(); tl.userPlay = false; tl.time((7 * i) / (STEPS.length - 1)); setPlaying(false); }
+  };
   return (
     <section className="journey" id="journey" ref={ref} aria-labelledby="journey-h" data-dark>
       <div className="jr-pin">
@@ -114,24 +127,36 @@ export function Journey() {
           <header className="jr-head">
             <span className="kick">03 / The journey</span>
             <h2 id="journey-h">Five stops from <em>surplus</em> to <em>served.</em></h2>
+            <button type="button" className="jr-play" onClick={toggle} aria-pressed={!playing}>{playing ? 'Pause' : 'Play'} journey</button>
           </header>
           <div className="jr-stage">
             <svg className="jr-svg" viewBox="0 0 1200 340" aria-hidden="true">
               <path id="jr-path" d={ROUTE} className="jr-base" />
               <path id="jr-draw" d={ROUTE} className="jr-line" pathLength="1" />
               {pts.map(([x, y], i) => (
-                <g key={i} className={'jr-node' + (i <= active ? ' on' : '')} transform={`translate(${x} ${y})`}>
+                <g key={i} className={'jr-node' + (i <= active ? ' on' : '') + (i === active ? ' now' : '')} transform={`translate(${x} ${y})`}>
                   <circle r="22" className="halo" /><circle r="9" className="core" />
                   <text y={i % 2 ? 52 : -38} textAnchor="middle">{STEPS[i][0]}</text>
                 </g>
               ))}
-              <g className="jr-marker"><rect x="-9" y="-9" width="18" height="18" transform="rotate(45)" /></g>
+              {/* the food travelling the route: a steaming bowl */}
+              <g className="jr-marker">
+                <g className="jr-steam" fill="none" stroke="#F4ECD8" strokeWidth="2.2" strokeLinecap="round">
+                  <path d="M-7 -16 C -11 -21, -3 -24, -7 -30" /><path d="M0 -17 C -4 -22, 4 -25, 0 -32" /><path d="M7 -16 C 3 -21, 11 -24, 7 -30" />
+                </g>
+                <path d="M-15 -8 C -12 -14, 12 -14, 15 -8 Z" fill="#E87968" />
+                <circle cx="-6" cy="-10" r="2.4" fill="#FFE28A" /><circle cx="4" cy="-11" r="2" fill="#F5D98B" />
+                <path d="M-19 -8 L19 -8 C 18 4, 10 11, 0 11 C -10 11, -18 4, -19 -8 Z" fill="#FFE28A" stroke="#102F46" strokeWidth="2.4" strokeLinejoin="round" />
+                <path d="M-8 11 L8 11 L6 15 L-6 15 Z" fill="#F5D98B" stroke="#102F46" strokeWidth="2" />
+              </g>
             </svg>
           </div>
           <ol className="jr-steps">
             {STEPS.map(([t, d], i) => (
               <li key={t} className={i === active ? 'on' : i < active ? 'past' : ''} data-step={i}>
-                <span className="jr-no">{String(i + 1).padStart(2, '0')}</span>
+                <button type="button" className="jr-dot" onClick={() => jump(i)} aria-label={`Show step ${i + 1}: ${t}`} aria-current={i === active ? 'step' : undefined}>
+                  <span className="jr-no">{String(i + 1).padStart(2, '0')}</span>
+                </button>
                 <div><h3>{t}</h3><p>{d}</p></div>
               </li>
             ))}
@@ -140,11 +165,6 @@ export function Journey() {
       </div>
     </section>
   );
-}
-function ScrollSteps(root, setActive) {
-  root.querySelectorAll('.jr-steps li').forEach((li, i) => {
-    ScrollTrigger.create({ trigger: li, start: 'top 70%', onEnter: () => setActive(i), onEnterBack: () => setActive(i) });
-  });
 }
 
 /* 5 ─ Food discovery (live Supabase data) ------------------------------------------- */
@@ -394,10 +414,16 @@ export function Footer() {
   return (
     <footer className="foot" data-dark>
       <div className="wrap">
-        <div className="foot-top">
-          <div className="foot-brand"><Monogram size={56} tone="reverse" /><p>Good food deserves a second journey.</p></div>
-          <nav className="foot-nav" aria-label="Footer">
-            <a href="#mission">Mission</a><a href="#journey">Journey</a><a href="#discover">Discover</a><a href="#impact">Impact</a><a href="#join">Contact</a><a href="signin.html">Sign in</a>
+        <div className="foot-card">
+          <div className="foot-brand">
+            <Monogram size={64} tone="reverse" />
+            <p>Good food deserves a second journey.</p>
+            <small>Connect · Share · Nourish</small>
+          </div>
+          <nav className="foot-cols" aria-label="Footer">
+            <div><h3>Platform</h3><a href="#discover">Explore food</a><a href="#journey">How it works</a><a href="#impact">Impact</a><a href="#stories">Stories</a></div>
+            <div><h3>Get involved</h3><a href="signin.html?role=donor&view=register">Join as a donor</a><a href="signin.html?role=ngo&view=register">Join as a receiver</a><a href="signin.html">Sign in</a></div>
+            <div><h3>Trust & support</h3><a href="#mission">About AnnSetu</a><a href="#join">Contact the team</a><a href="#join">FAQ</a></div>
           </nav>
           <div className="foot-cert">
             <h3>Verify a certificate</h3>

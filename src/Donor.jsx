@@ -4,7 +4,7 @@ import { db, CATEGORIES, uploadTo, toLocalInput, fmtDT, tleft, ago } from './lib
 import { need, loadDonor, subscribe, markAllRead } from './data.js';
 import { Shell, PageHead, Hero } from './shell.jsx';
 import { Btn, AsyncForm, Field, Card, Tag, Empty, Bar, Stat, Skeleton, useToast, useLoader, useHashTab, confetti } from './ui.jsx';
-import { VerifyBanner, canAct, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity } from './shared.jsx';
+import { VerifyBanner, canAct, profileComplete, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity } from './shared.jsx';
 
 const TABS = ['overview', 'listings', 'requests', 'pickups', 'impact', 'profile'];
 const lstatus = (l) => (l.status === 'active' && new Date(l.pickup_by) < new Date() ? 'expired' : l.status);
@@ -42,8 +42,10 @@ export default function Donor({ me }) {
     { id: 'impact', label: 'Impact', icon: <FiAward /> },
     { id: 'profile', label: 'Profile', icon: <FiUser /> },
   ];
+  const locked = !profileComplete(org, 'donor');
+  tabs.forEach((t) => { if (locked && t.id !== 'profile') t.disabled = true; });
   const titles = Object.fromEntries(tabs.map((t) => [t.id, t.label]));
-  const view = org ? tab : 'profile'; // no organisation yet: send them to the profile form
+  const view = profileComplete(org, 'donor') ? tab : 'profile'; // profile completion is compulsory (documents can come later)
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 

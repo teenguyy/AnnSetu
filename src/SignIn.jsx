@@ -3,32 +3,83 @@ import { FiEye, FiEyeOff, FiArrowLeft, FiCheck } from 'react-icons/fi';
 import { db, ROUTES, SIGNIN, EMAIL_RE, errMsg } from './lib.js';
 import { loadMe, need } from './data.js';
 import { ThemeToggle } from './shell.jsx';
-import { Logo } from './brand.jsx';
+import { Logo, Monogram } from './brand.jsx';
 import { Btn, AsyncForm, Field, useToast } from './ui.jsx';
 
-const SLIDES = [
-  ['Good food deserves a second journey.', 'Restaurants, hotels and canteens share what they can’t serve, safely and in minutes.'],
-  ['Find food close to your community.', 'NGOs discover fresh listings nearby and collect with their own representatives.'],
-  ['A bridge between a meal and a mouth.', 'Verified organisations, code-confirmed pickups and transparent impact.'],
-];
+const COPY = {
+  signin: ['Welcome back to the bridge.', 'Every handover starts with a single sign-in.'],
+  donor: ['Your surplus, someone’s next meal.', 'List what you can’t serve. Verified NGOs nearby collect it.'],
+  ngo: ['Fresh food, close to your community.', 'Discover nearby surplus and send your own representative.'],
+  choose: ['Join the AnnSetu bridge.', 'Choose how you are joining: as a donor or a receiver.'],
+};
 
-function Art() {
-  const [i, setI] = useState(0);
-  useEffect(() => { const t = setInterval(() => setI((x) => (x + 1) % SLIDES.length), 5600); return () => clearInterval(t); }, []);
+/* Bridge shared by every scene: deck + arch + hangers. */
+function Bridge({ tone }) {
   return (
-    <section className="art" aria-label="About AnnSetu" data-dark>
-      <Logo tone="reverse" />
-      <div className="cap" aria-live="polite">{SLIDES.map((s, k) => <div key={k} className={k === i ? 'on' : ''} aria-hidden={k !== i}><h2>{s[0]}</h2><p>{s[1]}</p></div>)}</div>
-      <svg className="scene" viewBox="0 0 520 220" aria-hidden="true">
-        <path className="sc-arch" d="M30 190 Q260 -20 490 190" pathLength="1" />
-        <path className="sc-deck" d="M0 150 H520" />
-        {[90, 140, 190, 240, 290, 340, 390, 440].map((x) => { const t = (x - 30) / 460; return <path key={x} className="sc-h" d={`M${x} ${(190 - 420 * t * (1 - t)).toFixed(1)} V150`} />; })}
-        <circle className="sc-n a" cx="30" cy="150" r="7" /><circle className="sc-n b" cx="490" cy="150" r="7" />
-        <circle className="sc-m" r="5"><animateMotion dur="6s" repeatCount="indefinite" path="M30 150 H490" /></circle>
-        <text x="30" y="182" className="sc-t">donor</text><text x="490" y="182" textAnchor="end" className="sc-t">community</text>
-      </svg>
+    <g className={'sc-bridge ' + tone}>
+      <path className="sc-arch" d="M30 190 Q260 -20 490 190" pathLength="1" />
+      <path className="sc-deck" d="M0 150 H520" />
+      {[90, 140, 190, 240, 290, 340, 390, 440].map((x) => { const t = (x - 30) / 460; return <path key={x} className="sc-h" d={`M${x} ${(190 - 420 * t * (1 - t)).toFixed(1)} V150`} />; })}
+    </g>
+  );
+}
+
+/* Different animation for a new donor, a new receiver, and one shared animation for signing in. */
+function Scene({ kind }) {
+  if (kind === 'donor') return (
+    <svg className="scene sc-donor" viewBox="0 0 520 220" aria-hidden="true" key="donor">
+      <circle className="sc-glow" cx="90" cy="120" r="90" />
+      <Bridge tone="warm" />
+      {/* a crate of food glides onto the deck from the donor's kitchen */}
+      <g className="sc-crate">
+        <rect x="-26" y="-34" width="52" height="34" rx="6" fill="#F5D98B" stroke="#102F46" strokeWidth="3" />
+        <path d="M-26 -22 H26" stroke="#102F46" strokeWidth="2" />
+        <circle cx="-10" cy="-40" r="9" fill="#E87968" /><circle cx="8" cy="-42" r="8" fill="#FFE28A" stroke="#102F46" strokeWidth="2" /><circle cx="-1" cy="-46" r="6" fill="#82C5DF" />
+      </g>
+      <g className="sc-bowl" transform="translate(70 120)">
+        <path className="sc-steam" d="M-8 -22 C -12 -28, -4 -32, -8 -38 M4 -22 C 0 -28, 8 -32, 4 -38" fill="none" stroke="#F4ECD8" strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M-22 -12 L22 -12 C 21 2, 12 10, 0 10 C -12 10, -21 2, -22 -12 Z" fill="#FFE28A" stroke="#102F46" strokeWidth="2.6" />
+      </g>
+      <text x="30" y="182" className="sc-t">your kitchen</text><text x="490" y="182" textAnchor="end" className="sc-t">a verified NGO</text>
+    </svg>
+  );
+  if (kind === 'ngo') return (
+    <svg className="scene sc-ngo" viewBox="0 0 520 220" aria-hidden="true" key="ngo">
+      <circle className="sc-glow cool" cx="430" cy="120" r="90" />
+      <Bridge tone="cool" />
+      {/* food arrives over the bridge into open hands on the community's bank */}
+      <circle className="sc-m" r="7" fill="#FFE28A"><animateMotion dur="3.2s" repeatCount="indefinite" path="M40 140 Q 260 -10 450 120" /></circle>
+      <g className="sc-hands" transform="translate(440 160)">
+        <path d="M-40 0 C -36 -16, -22 -26, -6 -24 L 0 -10 C -14 -12, -26 -6, -30 6 Z" fill="#A8D9E9" />
+        <path d="M40 0 C 36 -16, 22 -26, 6 -24 L 0 -10 C 14 -12, 26 -6, 30 6 Z" fill="#82C5DF" />
+      </g>
+      <g className="sc-people" fill="#A8D9E9">
+        <g><circle cx="372" cy="128" r="7" /><path d="M362 150 C 362 138, 382 138, 382 150 Z" /></g>
+        <g><circle cx="500" cy="124" r="7" /><path d="M490 146 C 490 134, 510 134, 510 146 Z" /></g>
+      </g>
+      <text x="30" y="182" className="sc-t">verified donors</text><text x="490" y="182" textAnchor="end" className="sc-t">your community</text>
+    </svg>
+  );
+  return (
+    <svg className={'scene sc-shared' + (kind === 'choose' ? ' quiet' : '')} viewBox="0 0 520 220" aria-hidden="true" key="shared">
+      <Bridge tone="sun" />
+      <circle className="sc-n a" cx="30" cy="150" r="7" /><circle className="sc-n b" cx="490" cy="150" r="7" />
+      <circle className="sc-m" r="7" fill="#FFE28A" stroke="#102F46" strokeWidth="2.5"><animateMotion dur="4.5s" repeatCount="indefinite" path="M30 150 H490" /></circle>
+      <text x="30" y="182" className="sc-t">donor</text><text x="490" y="182" textAnchor="end" className="sc-t">community</text>
+    </svg>
+  );
+}
+
+function Art({ view, role }) {
+  const kind = view === 'register' ? (role === 'donor' ? 'donor' : role === 'ngo' ? 'ngo' : 'choose') : 'signin';
+  const [title, text] = COPY[kind];
+  return (
+    <section className={'art art-' + kind} aria-label="About AnnSetu" data-dark>
+      <Logo tone="reverse" size={44} tagline />
+      <div className="art-mark" aria-hidden="true"><Monogram size={kind === 'signin' ? 120 : 84} tone="reverse" draw key={kind} /></div>
+      <div className="cap" aria-live="polite"><div className="on" key={kind}><h2>{title}</h2><p>{text}</p></div></div>
+      <Scene kind={kind} />
       <p className="art-note">verified · code-confirmed · real impact</p>
-      <div className="dots" aria-hidden="true">{SLIDES.map((_, k) => <i key={k} className={k === i ? 'on' : ''} />)}</div>
     </section>
   );
 }
@@ -140,7 +191,7 @@ export default function SignIn() {
   const t = titles[view];
   return (
     <div className="auth">
-      <Art />
+      <Art view={view} role={role} />
       <section className="panel">
         <div className="authbar"><a className="lk back" href="index.html"><FiArrowLeft /> AnnSetu home</a><ThemeToggle /></div>
         <div className="wrap">

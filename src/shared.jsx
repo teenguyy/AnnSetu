@@ -7,6 +7,21 @@ import { PageHead } from './shell.jsx';
 
 export const canAct = (org) => !!org && org.verification === 'approved' && !org.suspended;
 
+/* Profile completion is compulsory before the dashboard opens (documents can come later). */
+export function missingProfile(org, role) {
+  if (!org) return ['organisation details'];
+  const m = [];
+  if (!org.name || org.name.trim().length < 2) m.push('organisation name');
+  if (!org.phone || String(org.phone).replace(/\D/g, '').length < 7) m.push('phone');
+  if (!org.address || org.address.trim().length < 8) m.push('full address');
+  if (!org.about || org.about.trim().length < 20) m.push('about (20+ characters)');
+  if (org.lat == null || org.lng == null) m.push('location');
+  if (role === 'ngo' && (!org.area_served || org.area_served.trim().length < 2)) m.push('area served');
+  return m;
+}
+export const profileComplete = (org, role) => missingProfile(org, role).length === 0;
+export const NO_CERT_TYPES = ['NGO', 'Community group', 'Community kitchen'];
+
 export function VerifyBanner({ org, goProfile }) {
   if (!org) return (
     <div className="banner warn rise"><FiAlertTriangle /><div><b>Set up your organisation profile</b><span>Add your details and verification documents to get started.</span></div><Btn size="sm" kind="ghost" onClick={goProfile}>Open profile</Btn></div>
@@ -180,6 +195,11 @@ export function ProfileView({ role, user, org, docs, onChanged, extra }) {
   const save = async (fd) => {
     const v = { name: String(fd.get('name')).trim(), type: fd.get('type'), phone: String(fd.get('phone') || '').trim(), address: String(fd.get('address') || '').trim(), about: String(fd.get('about') || '').trim(), area: String(fd.get('area') || '').trim(), lat: pos.lat, lng: pos.lng };
     if (v.name.length < 2) throw new Error('Enter your organisation’s name.');
+    if (v.phone.replace(/\D/g, '').length < 7) throw new Error('Enter a phone number (at least 7 digits).');
+    if (v.address.length < 8) throw new Error('Enter your full address.');
+    if (v.about.length < 20) throw new Error('Tell us about your organisation in at least 20 characters.');
+    if (role === 'ngo' && v.area.length < 2) throw new Error('Enter the area you serve.');
+    if (v.lat === '' || v.lng === '' || v.lat == null || v.lng == null || isNaN(Number(v.lat)) || isNaN(Number(v.lng))) throw new Error('Add your location: use “Use my current location” or enter latitude and longitude.');
     const logo = fd.get('logo');
     if (logo && logo.size) {
       if (logo.size > 1024 * 1024) throw new Error('Logo must be 1 MB or smaller.');
@@ -187,7 +207,7 @@ export function ProfileView({ role, user, org, docs, onChanged, extra }) {
       v.logo_path = await uploadTo('org-logos', user.id, logo);
     }
     await saveOrg(user.id, role, org, v);
-    toast(org ? 'Profile saved.' : 'Profile created. Now upload your documents for verification.');
+    toast(org ? 'Profile saved.' : 'Profile created. Upload documents now, or later from this page.');
     await onChanged();
   };
   const upload = async (fd, form) => {
@@ -203,6 +223,9 @@ export function ProfileView({ role, user, org, docs, onChanged, extra }) {
   };
   const delDoc = async (d) => { need(await db.from('verification_documents').delete().eq('id', d.id)); toast('Document removed.'); await onChanged(); };
   return (<>
+    {missingProfile(org, role).length > 0 && (
+      <div className="banner warn rise" role="status"><FiAlertTriangle /><div><b>Complete your profile to continue</b><span>Required: {missingProfile(org, role).join(', ')}. Verification documents can be added later.</span></div></div>
+    )}
     <div className="phero rise">
       <div className="cover" />
       <div className="pbody">
@@ -227,14 +250,14 @@ export function ProfileView({ role, user, org, docs, onChanged, extra }) {
       <h3>Organisation details</h3>
       <AsyncForm onSubmit={save} className="mt">
         {({ busy }) => (<>
-          <Field label="Organisation name" wide><input name="name" defaultValue={org?.name || ''} maxLength={80} required /></Field>
+          <Field label="Organisation name *" wide><input name="name" defaultValue={org?.name || ''} maxLength={80} required /></Field>
           <Field label="Type"><select name="type" defaultValue={org?.org_type || types[0]}>{types.map((t) => <option key={t}>{t}</option>)}</select></Field>
-          <Field label="Phone"><input name="phone" defaultValue={org?.phone || ''} maxLength={20} inputMode="tel" /></Field>
-          {role === 'ngo' && <Field label="Area served"><input name="area" defaultValue={org?.area_served || ''} maxLength={80} placeholder="e.g. East Delhi" /></Field>}
-          <Field label={role === 'ngo' ? 'Address' : 'Pickup address'} wide={role !== 'ngo'}><input name="address" defaultValue={org?.address || ''} maxLength={160} /></Field>
-          <Field label="About" wide><textarea name="about" rows={3} maxLength={300} defaultValue={org?.about || ''} placeholder="A short description of your organisation" /></Field>
-          <Field label="Latitude" hint="Used to find food near you"><input value={pos.lat} onChange={(e) => setPos({ ...pos, lat: e.target.value })} inputMode="decimal" /></Field>
-          <Field label="Longitude"><input value={pos.lng} onChange={(e) => setPos({ ...pos, lng: e.target.value })} inputMode="decimal" /></Field>
+          <Field label="Phone *"><input name="phone" defaultValue={org?.phone || ''} maxLength={20} inputMode="tel" required /></Field>
+          {role === 'ngo' && <Field label="Area served *"><input name="area" defaultValue={org?.area_served || ''} maxLength={80} placeholder="e.g. East Delhi" required /></Field>}
+          <Field label={role === 'ngo' ? 'Address *' : 'Pickup address *'} wide={role !== 'ngo'}><input name="address" defaultValue={org?.address || ''} maxLength={160} required /></Field>
+          <Field label="About *" wide><textarea name="about" rows={3} maxLength={300} defaultValue={org?.about || ''} placeholder="Who you are, what you do, who you serve (20+ characters)" required /></Field>
+          <Field label="Latitude *" hint="Used to find food near you"><input value={pos.lat} onChange={(e) => setPos({ ...pos, lat: e.target.value })} inputMode="decimal" /></Field>
+          <Field label="Longitude *"><input value={pos.lng} onChange={(e) => setPos({ ...pos, lng: e.target.value })} inputMode="decimal" /></Field>
           <div className="wide"><Btn kind="ghost" size="sm" onClick={useMyLocation}><FiMapPin /> Use my current location</Btn></div>
           <Field label="Logo (optional, 1 MB max)" wide><input name="logo" type="file" accept="image/jpeg,image/png,image/webp" /></Field>
           <div className="wide"><Btn type="submit" busy={busy}>{org ? 'Save profile' : 'Create profile'}</Btn></div>
@@ -255,6 +278,7 @@ export function ProfileView({ role, user, org, docs, onChanged, extra }) {
             <div className="wide"><Btn type="submit" busy={busy}><FiUploadCloud /> Upload document</Btn></div>
           </>)}
         </AsyncForm>
+        {NO_CERT_TYPES.includes(org.org_type) && <NoCertificate org={org} hasDocs={docs.length > 0} onChanged={onChanged} />}
         <div className="docs">
           {docs.map((d) => (
             <div key={d.id} className="doc">
@@ -288,5 +312,48 @@ export function Activity({ events }) {
       <h3>Recent activity</h3>
       {events.slice(0, 6).map((e, i) => <div key={i} className="ev"><span>{e.t}</span><small className="m">{ago(new Date(e.at).getTime())}</small></div>)}
     </Card>
+  );
+}
+
+/* "We don't have a registration certificate": manual admin review (sql/annsetu_schema_part6_no_certificate.sql). */
+function NoCertificate({ org, hasDocs, onChanged }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(!!org.no_certificate);
+  if (org.verification === 'approved') return null;
+  if (org.no_certificate && org.no_certificate_requested_at) {
+    return (
+      <div className="nocert done" role="status">
+        <FiClock /><div><b>Manual review requested</b>
+          <span>Requested {fmtD(org.no_certificate_requested_at)}. Your request will be reviewed within <b>3–5 business days</b>. We’ll notify you here and by email.</span>
+          <button type="button" className="lk" onClick={async () => { try { need(await db.from('organizations').update({ no_certificate: false, no_certificate_note: null }).eq('id', org.id)); await onChanged(); } catch (e) { toast(e.message, 'bad'); } }}>Withdraw request (I'll upload a document instead)</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="nocert">
+      <label className="ck2"><input type="checkbox" checked={open} onChange={(e) => setOpen(e.target.checked)} /> <span><b>We don’t have a registration certificate</b> (local NGOs, community groups and community kitchens)</span></label>
+      {open && (
+        <AsyncForm className="mt" onSubmit={async (fd) => {
+          const note = String(fd.get('note') || '').trim();
+          if (note.length < 30) throw new Error('Please explain who you serve, since when, and any references (at least 30 characters).');
+          try { need(await db.from('organizations').update({ no_certificate: true, no_certificate_note: note }).eq('id', org.id)); }
+          catch (e) {
+            if (/no_certificate|column/i.test(e.message || '')) throw new Error('This option needs a database update (sql/annsetu_schema_part6_no_certificate.sql). Please contact AnnSetu support.');
+            throw e;
+          }
+          toast('Request sent. Your request will be reviewed within 3–5 business days.');
+          await onChanged();
+        }}>
+          {({ busy }) => (<>
+            <Field label="Tell the admins about your organisation" wide hint={hasDocs ? 'Supporting files you uploaded above (photos, letters, ID) help the review.' : 'Optional: upload any supporting proof above (photos, letters, ID) as “Other proof”.'}>
+              <textarea name="note" rows={4} minLength={30} maxLength={1000} defaultValue={org.no_certificate_note || ''} placeholder="Who you serve, since when, where, and people or organisations who can vouch for you" />
+            </Field>
+            <p className="m wide">Your request will be reviewed within <b>3–5 business days</b>.</p>
+            <div className="wide"><Btn type="submit" busy={busy}>Request admin review</Btn></div>
+          </>)}
+        </AsyncForm>
+      )}
+    </div>
   );
 }
