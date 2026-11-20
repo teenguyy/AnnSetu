@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'supabase_service.dart';
@@ -28,9 +29,19 @@ class LocationService {
     final denied = await ensurePermission();
     if (denied != null) return denied;
     var last = DateTime.fromMillisecondsSinceEpoch(0);
-    _active[requestId] = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 10),
-    ).listen((p) async {
+    // On Android a foreground service keeps sending the location while the app is in the background
+    // or the screen is off (like delivery apps). A persistent notification shows while it runs.
+    final settings = defaultTargetPlatform == TargetPlatform.android
+        ? AndroidSettings(
+            accuracy: LocationAccuracy.high, distanceFilter: 10, intervalDuration: const Duration(seconds: 5),
+            foregroundNotificationConfig: const ForegroundNotificationConfig(
+              notificationTitle: 'AnnSetu pickup in progress',
+              notificationText: 'Sharing your live location with the donor and NGO until delivery.',
+              notificationChannelName: 'Pickup tracking', enableWakeLock: true, setOngoing: true,
+            ),
+          )
+        : const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 10);
+    _active[requestId] = Geolocator.getPositionStream(locationSettings: settings).listen((p) async {
       if (DateTime.now().difference(last).inSeconds < 5) return; // the RPC also throttles to 3 s
       last = DateTime.now();
       try {
