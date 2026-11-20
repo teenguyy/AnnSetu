@@ -7,3 +7,6 @@ backend/tests
 **/__pycache__
 backend/.pytest_cache
 backend/.ruff_cache
+mobile
+sql
+*.apk
