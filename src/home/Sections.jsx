@@ -346,11 +346,11 @@ export function Leaderboard() {
 }
 
 /* About the app + download ------------------------------------------------------------ */
-// The APKs are served by this site from /download (see vercel.json for the download headers).
-// Build them with: cd mobile && flutter build apk --release --split-per-abi, then copy
-// app-arm64-v8a-release.apk -> download/AnnSetu.apk and app-armeabi-v7a-release.apk -> download/AnnSetu-armv7.apk.
-// Always ship split APKs from now on: their versionCode (1000s/2000s) is higher than a universal build's.
-export const APP_RELEASE = { version: '1.0.6', size: '23 MB', sizeV7: '21 MB', minAndroid: '7.0', href: 'download/AnnSetu.apk', hrefV7: 'download/AnnSetu-armv7.apk' };
+// The APK is served by this site from /download (see vercel.json for the download headers).
+// One universal APK that runs on every Android phone (64-bit, 32-bit and x86):
+// cd mobile && flutter build apk --release, then copy app-release.apk -> download/AnnSetu.apk.
+// Keep the build number in mobile/pubspec.yaml above 3008 so updates install over every earlier build.
+export const APP_RELEASE = { version: '1.0.7', size: '65 MB', minAndroid: '7.0', href: 'download/AnnSetu.apk' };
 
 export function AppAbout() {
   const r = APP_RELEASE;
@@ -382,7 +382,7 @@ export function AppAbout() {
               <li>If Android asks, allow <b>Install unknown apps</b> for your browser. The app is not on Play Store yet.</li>
               <li>Tap <b>Install</b>, open AnnSetu and sign in with your website account.</li>
             </ol>
-            <p className="app-meta">Older phone and the install fails? Try the <a href={r.hrefV7} download="AnnSetu-armv7.apk">32-bit version ({r.sizeV7})</a>.</p>
+            <p className="app-meta">One download works on every Android phone, new or old.</p>
           </details>
         </div>
         <div className="app-phone">
