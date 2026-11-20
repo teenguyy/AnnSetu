@@ -173,7 +173,7 @@ export default function Receiver({ me }) {
         {view === 'impact' && org && <ImpactView org={org} kind="ngo" stats={stats} />}
         {view === 'profile' && <><PageHead kicker="Organisation" title="Profile" sub="Your organisation, representatives and documents." /><ProfileView role="ngo" user={me.user} org={org} docs={docs} onChanged={async () => { if (!org) setTab('profile'); await refresh(); }} extra={org ? repsCard : null} /></>}
       </>}
-      {chat && <ChatModal request={chat} meId={uid} title={`Chat with ${chat.donor?.name || 'donor'}`} onClose={() => setChat(null)} />}
+      {chat && <ChatModal request={chat} meId={uid} side="ngo" names={{ donor: chat.donor?.name || 'Donor', rep: chat.rep_name ? chat.rep_name + ' (representative)' : 'Representative' }} onClose={() => setChat(null)} />}
       {report && <ReportModal reporterOrg={org.id} reportedOrg={report.listing.donor_org_id} requestId={report.id} reportedName={report.donor?.name} onClose={() => setReport(null)} />}
     </Shell>
   );

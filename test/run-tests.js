@@ -197,8 +197,17 @@ const shot = (p, n) => p.screenshot({ path: path.join(SHOTS, n + '.png') });
   ok(/Ada Admin/.test(await page.textContent('.tbl tbody')), 'audit log shows WHO approved or rejected (admin name)');
   await shot(page, 'admin');
 
+  console.log('NGO: publishes a community need');
+  await as('ngo@t.org', 'receiver.html'); await T('.hero'); await hash('needs'); await T('input[name=title]');
+  await page.fill('input[name=title]', 'Rajma chawal for 50'); await page.fill('input[name=qty]', '50'); await click('Publish need'); await T('text=Rajma chawal for 50');
+
   console.log('DONOR: publish listing');
   await as('donor@t.org', 'donor.html'); await T('.hero');
+  await hash('needs'); await T('.need-card');
+  ok(/Rajma chawal for 50/.test(await page.textContent('.need-card')) && /Asha Kitchen/.test(await page.textContent('.need-card')), 'donor sees the needs published by receivers');
+  await click('List food for this need'); await T('input[name=title]');
+  ok(await page.inputValue('input[name=title]') === 'Rajma chawal for 50' && await page.inputValue('input[name=qty]') === '50', 'donor can list food for a need in one click (pre-filled)');
+  await click('Close');
   await hash('listings'); await click('New listing'); await T('input[name=title]');
   await page.fill('input[name=title]', 'Vegetable biryani'); await page.fill('input[name=qty]', '40'); await click('Publish listing'); await T('text=Vegetable biryani');
   ok(await page.locator('.lcard, .card:has-text("Vegetable biryani")').count() >= 1, 'donor published a listing');
@@ -216,6 +225,7 @@ const shot = (p, n) => p.screenshot({ path: path.join(SHOTS, n + '.png') });
   const st = await drag(page.locator('.food').first(), page.locator('.tray'));
   ok(st.drag && st.drop && st.hot, 'drag feedback: cursor drag + valid-drop states, tray highlights');
   await T('.tray-list li'); ok(await page.locator('.tray-list li').count() === 1, 'dropped listing lands in the request tray');
+  ok(await page.inputValue('.tl-q input') === '40', 'tray pre-fills the full available quantity (40), not a capped 10');
   await page.fill('.tl-q input', '999'); await click('Send request'); await T('.toast.bad');
   ok(/between 1 and 40/.test(await page.textContent('.toast.bad')), 'tray validates quantity before calling create_request');
   await page.fill('.tl-q input', '15'); await click('Send request'); await page.waitForFunction(() => /Request sent to the donor/.test(document.body.innerText));
@@ -251,6 +261,12 @@ const shot = (p, n) => p.screenshot({ path: path.join(SHOTS, n + '.png') });
   ok(/Trip started/i.test(await page.textContent('.toast')), 'representative confirms “Start trip”');
   await page.waitForTimeout(500); ok(/On the way/.test(await page.textContent('.lt-steps li.now')), 'step moves to “On the way”');
   await shot(page, 'rep-pickup');
+  await page.locator('.rep-pick').getByRole('button', { name: 'Message' }).first().click(); await T('.chat-tabs');
+  ok(await page.locator('.chat-tabs button').count() === 2 && /Spice Route Restaurant/.test(await page.textContent('.chat-tabs')) && /Asha Kitchen/.test(await page.textContent('.chat-tabs')), 'representative has two private chats: with the donor and with the NGO');
+  await page.fill('.chatf input', 'Reaching in 10 minutes'); await page.press('.chatf input', 'Enter'); await T('.bub.me');
+  ok(/only you and Spice Route Restaurant/.test(await page.textContent('.chat-private')), 'chat says who can see it');
+  ok(await page.evaluate(() => window.__mock.db.messages.at(-1).thread) === 'donor_rep', 'message goes to the private donor ↔ representative thread');
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300);
 
   console.log('DONOR: confirm OTP');
   await as('donor@t.org', 'donor.html'); await T('.hero'); await hash('pickups'); await T('.otp');
@@ -279,7 +295,8 @@ const shot = (p, n) => p.screenshot({ path: path.join(SHOTS, n + '.png') });
   await page.locator('button[aria-label^="Switch to light"]').click();
 
   console.log('ADMIN: leaderboard + weekly landing snapshot');
-  await as('admin@t.org', 'admin.html'); await T('.hero'); await hash('leaderboard'); await T('.lb-row');
+  await as('admin@t.org', 'admin.html'); await T('.hero');
+  await hash('needs'); await T('.need-card'); ok(/Rajma chawal for 50/.test(await page.textContent('main')), 'admin sees community needs'); await hash('leaderboard'); await T('.lb-row');
   ok(/Spice Route Restaurant/.test(await page.textContent('main')), 'admin sees the donor leaderboard');
   await click('Refresh now'); await page.waitForSelector('.toast'); ok(/refreshed/i.test(await page.textContent('.toast')), 'admin can refresh landing numbers now (otherwise weekly)');
   await page.locator('.lb-row', { hasText: 'Spice Route Restaurant' }).getByRole('button', { name: /Pin/ }).click(); await T('.modal textarea');

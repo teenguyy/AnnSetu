@@ -41,42 +41,63 @@ export function VerifyBanner({ org, goProfile }) {
 }
 
 /* ---------------- chat ---------------- */
-export function ChatModal({ request, meId, title, onClose }) {
+/* Private conversations per pickup: each thread is visible only to its two parties (enforced by the database). */
+const THREADS = {
+  donor: [['donor_ngo', 'ngo'], ['donor_rep', 'rep']],
+  ngo: [['donor_ngo', 'donor'], ['ngo_rep', 'rep']],
+  rep: [['donor_rep', 'donor'], ['ngo_rep', 'ngo']],
+};
+export function ChatModal({ request, meId, side = 'donor', names = {}, onClose }) {
+  const threads = THREADS[side] || THREADS.donor;
+  const [thread, setThread] = useState(threads[0][0]);
   const [msgs, setMsgs] = useState(null);
   const [text, setText] = useState('');
   const box = useRef();
   const toast = useToast();
-  const load = async () => { try { setMsgs(await loadMessages(request.id)); } catch (e) { toast(e.message, 'bad'); } };
+  const label = (who) => names[who] || (who === 'ngo' ? 'Receiver' : who === 'rep' ? 'Representative' : 'Donor');
+  const other = threads.find((t) => t[0] === thread)[1];
+  const load = async () => { try { setMsgs(await loadMessages(request.id, thread)); } catch (e) { toast(e.message, 'bad'); } };
   useEffect(() => {
-    load();
+    setMsgs(null); load();
     let ch = null;
     try {
-      ch = db.channel('msg-' + request.id)
+      ch = db.channel('msg-' + request.id + '-' + thread)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'request_id=eq.' + request.id }, load).subscribe();
     } catch (e) {}
     const poll = setInterval(load, 8000);
     return () => { clearInterval(poll); if (ch) db.removeChannel(ch); };
-  }, [request.id]); // eslint-disable-line
+  }, [request.id, thread]); // eslint-disable-line
   useEffect(() => { if (box.current) box.current.scrollTop = box.current.scrollHeight; }, [msgs]);
   const send = async (e) => {
     e.preventDefault();
     const b = text.trim();
     if (!b) return;
     setText('');
-    try { await sendMessage(request.id, b); await load(); } catch (x) { setText(b); toast(x.message, 'bad'); }
+    try { await sendMessage(request.id, b, thread); await load(); } catch (x) { setText(b); toast(x.message, 'bad'); }
   };
   return (
-    <Modal title={title} onClose={onClose}>
+    <Modal title="Messages" onClose={onClose}>
+      <div className="chat-tabs" role="tablist" aria-label="Conversations">
+        {threads.map(([t, who]) => (
+          <button key={t} role="tab" aria-selected={thread === t} className={thread === t ? 'on' : ''} onClick={() => setThread(t)}>{label(who)}</button>
+        ))}
+      </div>
+      <p className="chat-private"><FiShield /> Private: only you and {label(other)} can see this chat.</p>
       <div className="chat" ref={box}>
-        {msgs === null ? <div className="m">Loading…</div> : msgs.length === 0 ? <div className="m center">No messages yet. Say hello and coordinate the pickup.</div> :
-          msgs.map((m) => (
-            <div key={m.id} className={'bub' + (m.sender_id === meId ? ' me' : '')}>
-              <p>{m.body}</p><small>{ago(new Date(m.created_at).getTime())}</small>
-            </div>
-          ))}
+        {msgs === null ? <div className="m">Loading…</div> : msgs.length === 0 ? <div className="m center">No messages yet. Say hello to {label(other)}.</div> :
+          msgs.map((m, i) => {
+            const mine = m.sender_id === meId;
+            const prev = msgs[i - 1];
+            const grouped = prev && prev.sender_id === m.sender_id && new Date(m.created_at) - new Date(prev.created_at) < 120000;
+            return (
+              <div key={m.id} className={'bub' + (mine ? ' me' : '') + (grouped ? ' grp' : '')}>
+                <p>{m.body}</p><small>{new Date(m.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</small>
+              </div>
+            );
+          })}
       </div>
       <form className="chatf" onSubmit={send}>
-        <input value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder="Write a message…" aria-label="Message" />
+        <input value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder={`Message ${label(other)}…`} aria-label="Message" />
         <button className="btn primary" type="submit" aria-label="Send"><FiSend /></button>
       </form>
     </Modal>
@@ -467,4 +488,37 @@ export function RepLocation({ requestId }) {
 export function CallLink({ phone, label }) {
   if (!phone) return null;
   return <a className="btn ghost sm" href={'tel:' + String(phone).replace(/[^+\d]/g, '')}><FiPhone /> {label || 'Call'}</a>;
+}
+
+/* ---------------- community needs (published by verified receivers) ---------------- */
+export async function loadNeeds(all = false) {
+  let q = db.from('requirements').select('*').order('needed_by', { ascending: true }).limit(200);
+  if (!all) q = q.eq('status', 'open');
+  const rows = need(await q) || [];
+  const ids = [...new Set(rows.map((r) => r.ngo_org_id))];
+  const orgs = ids.length ? need(await db.from('organizations').select('id,name,org_type,area_served,address,phone').in('id', ids)) || [] : [];
+  const byId = Object.fromEntries(orgs.map((o) => [o.id, o]));
+  return rows.map((r) => ({ ...r, ngo: byId[r.ngo_org_id] || null }));
+}
+export function NeedsList({ admin, onHelp, emptyText }) {
+  const { data, error } = useLoader(() => loadNeeds(admin), [admin]);
+  if (error) return <Empty>Couldn’t load needs: {error.message}</Empty>;
+  if (!data) return <Skeleton />;
+  if (!data.length) return <Empty>{emptyText || 'No open needs right now.'}</Empty>;
+  return data.map((n, i) => {
+    const late = new Date(n.needed_by) < new Date();
+    return (
+      <Card key={n.id} i={i} className="need-card">
+        <div className="row"><div><h3>{n.title}</h3>
+          <span className="m">{n.quantity} needed by {fmtDT(n.needed_by)} · {n.ngo ? n.ngo.name : 'Receiver'}{n.ngo?.area_served ? ' · serves ' + n.ngo.area_served : ''}</span></div>
+          <Tag s={n.status === 'open' ? (late ? 'rejected' : 'pending') : 'approved'}>{n.status === 'open' ? (late ? 'overdue' : 'open') : n.status}</Tag></div>
+        {(onHelp || n.ngo?.phone) && (
+          <div className="acts">
+            {onHelp && n.status === 'open' && <Btn size="sm" onClick={() => onHelp(n)}>List food for this need</Btn>}
+            {n.ngo?.phone && <a className="btn ghost sm" href={'tel:' + String(n.ngo.phone).replace(/[^+\d]/g, '')}>Call {n.ngo.name}</a>}
+          </div>
+        )}
+      </Card>
+    );
+  });
 }

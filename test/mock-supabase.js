@@ -155,7 +155,7 @@
         if (t === 'organizations') arr.forEach((o) => { Object.assign(o, { verification: 'pending', suspended: false }); db.profiles.filter((p) => p.role === 'admin').forEach((a) => db.notifications.push({ id: uuid(), user_id: a.id, title: 'New registration', body: o.name, read: false, created_at: now() })); });
         if (t === 'food_listings') arr.forEach((l) => Object.assign(l, { qty_reserved: 0, status: 'active' }));
         if (t === 'verification_documents') arr.forEach((d) => Object.assign(d, { status: 'pending' }));
-        if (t === 'messages') arr.forEach((m) => (m.sender_id = uid()));
+        if (t === 'messages') arr.forEach((m) => { m.sender_id = uid(); m.thread = m.thread || 'donor_ngo'; });
         if (t === 'requirements') arr.forEach((n) => (n.status = 'open'));
         if (t === 'reports') arr.forEach((r) => (r.status = 'open'));
         if (t === 'contact_messages') arr.forEach((c) => (c.status = 'new'));

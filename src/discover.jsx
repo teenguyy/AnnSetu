@@ -134,8 +134,9 @@ function Tray({ trayRef, items, setItems, reps, rep, setRep, ok, lockReason, loc
               <li key={l.id} className={res ? 'res-' + res.s : ''}>
                 <div className="tl-t"><b>{l.title}</b><small>{l.donor_name} · max {left} {l.unit}</small>
                   {res && <small className={'tl-r ' + res.s} role={res.s === 'bad' ? 'alert' : undefined}>{res.s === 'ok' ? <><FiCheck /> Request sent</> : <><FiAlertTriangle /> {res.m}</>}</small>}</div>
-                <label className="tl-q"><span className="sr">Quantity for {l.title}</span>
-                  <input type="number" min="1" max={left} value={qty} inputMode="numeric" onChange={(e) => update(l.id, e.target.value)} /></label>
+                <label className="tl-q"><span className="tl-ql" aria-hidden="true">How many?</span><span className="sr">Quantity for {l.title}</span>
+                  <input type="number" min="1" max={left} value={qty} inputMode="numeric" onChange={(e) => update(l.id, e.target.value)} />
+                  <span className="tl-qm">of {left}</span></label>
                 <button type="button" className="ib sm" onClick={() => remove(l.id)} aria-label={`Remove ${l.title} from tray`}><FiX /></button>
               </li>
             );
@@ -190,7 +191,7 @@ export function DiscoverBoard({ listings, error, reps = [], ok, lockReason, lock
   const add = useCallback((l) => {
     if (!ok) { toast(lockReason || 'Sign in as a verified receiver to request food.', 'info'); return; }
     if (!eligible(l)) { toast('This listing can no longer be requested.', 'bad'); return; }
-    setItems((xs) => (xs.some((x) => x.l.id === l.id) ? xs : [...xs, { l, qty: Math.min(availableOf(l), 10) }]));
+    setItems((xs) => (xs.some((x) => x.l.id === l.id) ? xs : [...xs, { l, qty: availableOf(l) }])); // default: everything still available
     setResults((r) => { const n = { ...r }; delete n[l.id]; return n; });
     toast(`${l.title} added to your request tray.`, 'info');
   }, [ok, lockReason, toast]);

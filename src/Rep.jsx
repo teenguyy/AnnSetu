@@ -88,7 +88,7 @@ export default function Rep({ me }) {
         <PageHead kicker="Record" title="History" sub="Pickups from the last 30 days." />
         {past.length ? past.map(pickupCard) : <Empty>No completed pickups yet.</Empty>}
       </>)}
-      {chat && <ChatModal request={chat} meId={uid} title={`Chat about ${chat.listing_title}`} onClose={() => setChat(null)} />}
+      {chat && <ChatModal request={chat} meId={uid} side="rep" names={{ donor: chat.donor_name, ngo: chat.ngo_name }} onClose={() => setChat(null)} />}
     </Shell>
   );
 }

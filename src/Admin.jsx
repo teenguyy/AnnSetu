@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { FiHome, FiShield, FiBriefcase, FiList, FiInbox, FiFlag, FiMail, FiEdit3, FiClipboard, FiEye, FiCheck, FiX, FiUsers, FiBox, FiHeart, FiTrendingUp, FiAlertTriangle, FiTrash2, FiPlus, FiCpu, FiAward, FiRefreshCw, FiStar, FiEyeOff } from 'react-icons/fi';
 import { api, apiReady } from './api.js';
+import { NeedsList } from './shared.jsx';
 import { db, fmtDT, fmtD, tleft, DOC_TYPES } from './lib.js';
 import { need, loadNotes, markAllRead, subscribe } from './data.js';
 import { Shell, PageHead, Hero } from './shell.jsx';
 import { Btn, AsyncForm, Field, Card, Tag, Empty, Stat, Skeleton, Modal, useToast, useLoader, useHashTab } from './ui.jsx';
 
-const TABS = ['overview', 'verify', 'orgs', 'listings', 'requests', 'reports', 'leaderboard', 'inbox', 'content', 'audit'];
+const TABS = ['overview', 'verify', 'orgs', 'listings', 'needs', 'requests', 'reports', 'leaderboard', 'inbox', 'content', 'audit'];
 const all = async (q) => need(await q) || [];
 /* SLA helper for no-certificate reviews (3-5 business days promised to the organisation). */
 function addBusinessDays(d, n) {
@@ -120,6 +121,7 @@ export default function Admin({ me }) {
     { id: 'verify', label: 'Verification', icon: <FiShield />, badge: pend.length || null },
     { id: 'orgs', label: 'Organisations', icon: <FiBriefcase /> },
     { id: 'listings', label: 'Listings', icon: <FiList /> },
+    { id: 'needs', label: 'Needs', icon: <FiHeart /> },
     { id: 'requests', label: 'Requests', icon: <FiInbox /> },
     { id: 'reports', label: 'Reports', icon: <FiFlag />, badge: openRep.length || null },
     { id: 'leaderboard', label: 'Leaderboard', icon: <FiAward /> },
@@ -273,6 +275,9 @@ export default function Admin({ me }) {
                 <Btn size="sm" kind="ghost" onClick={() => setModal({ title: 'Dismiss report', label: 'Why is it dismissed?', cta: 'Dismiss', run: async (n) => { need(await db.rpc('resolve_report', { p_report: r.id, p_status: 'dismissed', p_note: n, p_suspend: false })); toast('Report dismissed'); await refresh(); } })}>Dismiss</Btn>
               </div>)}
           </Card>)) : <Empty>No reports. Great news.</Empty>}</>)}
+
+      {tab === 'needs' && (<><PageHead kicker="Community" title="Needs" sub="Requirements published by receivers. Verified donors see the open ones in their dashboard." />
+        <NeedsList admin emptyText="No receiver has published a need yet." /></>)}
 
       {tab === 'leaderboard' && (<><PageHead kicker="Recognition" title="Leaderboard" sub={`Everyone sees the top ${percent}% of donors and receivers by food shared. Curate with a reason; every change is audited.`} />
         <Card className="lb-settings">

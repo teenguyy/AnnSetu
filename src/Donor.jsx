@@ -4,10 +4,10 @@ import { db, CATEGORIES, uploadTo, toLocalInput, fmtDT, tleft, ago } from './lib
 import { need, loadDonor, subscribe, markAllRead } from './data.js';
 import { Shell, PageHead, Hero } from './shell.jsx';
 import { Btn, AsyncForm, Field, Card, Tag, Empty, Bar, Stat, Skeleton, useToast, useLoader, useHashTab, confetti } from './ui.jsx';
-import { VerifyBanner, canAct, profileComplete, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity } from './shared.jsx';
+import { VerifyBanner, canAct, profileComplete, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity, NeedsList } from './shared.jsx';
 import { LiveTrack } from './LiveTrack.jsx';
 
-const TABS = ['overview', 'listings', 'requests', 'pickups', 'impact', 'profile'];
+const TABS = ['overview', 'listings', 'needs', 'requests', 'pickups', 'impact', 'profile'];
 const lstatus = (l) => (l.status === 'active' && new Date(l.pickup_by) < new Date() ? 'expired' : l.status);
 
 export default function Donor({ me }) {
@@ -18,6 +18,7 @@ export default function Donor({ me }) {
   const [chat, setChat] = useState(null);
   const [report, setReport] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [prefill, setPrefill] = useState(null);
   const [flt, setFlt] = useState('all');
   useEffect(() => subscribe(uid, refresh), [uid]); // eslint-disable-line
 
@@ -39,6 +40,7 @@ export default function Donor({ me }) {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: <FiHome /> },
     { id: 'listings', label: 'Listings', icon: <FiList /> },
+    { id: 'needs', label: 'Community needs', icon: <FiHeart /> },
     { id: 'requests', label: 'Requests', icon: <FiInbox />, badge: pending.length || null },
     { id: 'pickups', label: 'Pickups', icon: <FiMapPin />, badge: accepted.length || null },
     { id: 'impact', label: 'Impact', icon: <FiAward /> },
@@ -107,7 +109,7 @@ export default function Donor({ me }) {
     }
     need(await db.from('food_listings').insert({ donor_org_id: org.id, title, category: fd.get('cat'), quantity: qty, unit: fd.get('unit'), prepared_at: prep.toISOString(), pickup_by: by.toISOString(), safety_notes: String(fd.get('notes') || '').trim() || null, photo_path }));
     toast('Listing published. Verified NGOs nearby can now request it.');
-    setShowForm(false);
+    setShowForm(false); setPrefill(null);
     await refresh();
   };
 
@@ -119,9 +121,10 @@ export default function Donor({ me }) {
         <h3>Publish surplus food</h3>
         <AsyncForm onSubmit={newListing} className="mt">
           {({ busy }) => (<>
-            <Field label="Food item" wide><input name="title" maxLength={80} placeholder="e.g. Vegetable biryani" required /></Field>
+            {prefill && <div className="note wide">For the need from <b>{prefill.ngo}</b>: {prefill.qty} × {prefill.title}</div>}
+            <Field label="Food item" wide><input name="title" maxLength={80} placeholder="e.g. Vegetable biryani" defaultValue={prefill?.title || ''} key={'t' + (prefill?.id || '')} required /></Field>
             <Field label="Category"><select name="cat">{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></Field>
-            <Field label="Quantity"><input name="qty" type="number" min="1" max="10000" required /></Field>
+            <Field label="Quantity"><input name="qty" type="number" min="1" max="10000" defaultValue={prefill?.qty || ''} key={'q' + (prefill?.id || '')} required /></Field>
             <Field label="Unit"><select name="unit"><option>portions</option><option>kg</option><option>packs</option></select></Field>
             <Field label="Prepared at"><input name="prep" type="datetime-local" defaultValue={toLocalInput(Date.now() - 30 * 6e4)} required /></Field>
             <Field label="Pickup by"><input name="by" type="datetime-local" defaultValue={toLocalInput(Date.now() + 3 * 36e5)} required /></Field>
@@ -186,9 +189,12 @@ export default function Donor({ me }) {
         {view === 'requests' && requestsView}
         {view === 'pickups' && pickupsView}
         {view === 'impact' && org && <ImpactView org={org} kind="donor" stats={stats} />}
+        {view === 'needs' && (<><PageHead kicker="Community" title="Community needs" sub="What verified receivers have asked for. List matching food and they can request it." />
+          {!ok ? <Empty>Needs are visible once your organisation is verified.</Empty>
+            : <NeedsList onHelp={(n) => { setPrefill({ id: n.id, title: n.title, qty: n.quantity, ngo: n.ngo?.name || 'a receiver' }); setShowForm(true); setTab('listings'); }} emptyText="No open needs right now. Check back soon." />}</>)}
         {view === 'profile' && <><PageHead kicker="Organisation" title="Profile" sub="Your organisation, verification and documents." /><ProfileView role="donor" user={me.user} org={org} docs={docs} onChanged={async () => { if (!org) setTab('profile'); await refresh(); }} /></>}
       </>}
-            {chat && <ChatModal request={chat} meId={uid} title={`Chat with ${chat.ngo.name}`} onClose={() => setChat(null)} />}
+            {chat && <ChatModal request={chat} meId={uid} side="donor" names={{ ngo: chat.ngo.name, rep: chat.rep_name ? chat.rep_name + ' (representative)' : 'Representative' }} onClose={() => setChat(null)} />}
       {report && <ReportModal reporterOrg={org.id} reportedOrg={report.ngo_org_id} requestId={report.id} reportedName={report.ngo.name} onClose={() => setReport(null)} />}
     </Shell>
   );

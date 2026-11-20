@@ -438,3 +438,5 @@ html.is-dragging, html.is-dragging * { user-select: none; -webkit-user-select: n
 .art .logo .wm-name { font-size: 2.3rem; }
 .art .logo .wm-tag { font-size: .66rem; margin-top: .45rem; }
 .art .logo .logo-swoosh { width: 150px; top: -18px; }
+.tl-q { display: grid; justify-items: center; gap: 2px; }
+.tl-ql, .tl-qm { font: 600 .66rem var(--f-grot); letter-spacing: .04em; color: var(--sky-l); text-transform: uppercase; }

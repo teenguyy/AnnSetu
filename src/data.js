@@ -104,9 +104,9 @@ export async function loadImpact(orgId, kind) {
 }
 
 /* ---------- chat + reports ---------- */
-export const loadMessages = async (reqId) =>
-  need(await db.from('messages').select('*').eq('request_id', reqId).order('created_at', { ascending: true }).limit(200)) || [];
-export const sendMessage = async (reqId, body) => need(await db.from('messages').insert({ request_id: reqId, body }));
+export const loadMessages = async (reqId, thread = 'donor_ngo') =>
+  need(await db.from('messages').select('*').eq('request_id', reqId).eq('thread', thread).order('created_at', { ascending: true }).limit(300)) || [];
+export const sendMessage = async (reqId, body, thread = 'donor_ngo') => need(await db.from('messages').insert({ request_id: reqId, body, thread }));
 export const fileReport = async (r) => need(await db.from('reports').insert(r));
 
 /* ---------- live updates ---------- */
