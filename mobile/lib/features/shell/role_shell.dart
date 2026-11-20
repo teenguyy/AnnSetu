@@ -13,6 +13,7 @@ import '../donor/donor_screens.dart';
 import '../profile/profile_screen.dart';
 import '../receiver/receiver_screens.dart';
 import '../rep/rep_screens.dart';
+import '../../shared/widgets/website_link.dart';
 
 class _Tab {
   final String label;
@@ -121,6 +122,7 @@ class TabAppBar extends StatelessWidget implements PreferredSizeWidget {
         titleSpacing: 16,
         title: Row(children: [const BrandMark(size: 32), const SizedBox(width: 12), Flexible(child: Text(title, overflow: TextOverflow.ellipsis))]),
         actions: [...actions,
+          const WebsiteButton(),
           IconButton(tooltip: 'Ask AnnSetu', onPressed: () => context.push('/assistant'), icon: const Icon(Icons.smart_toy_outlined)),
           const NotificationBell(), const SizedBox(width: 6)],
         bottom: bottom,

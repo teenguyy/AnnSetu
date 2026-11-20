@@ -9,6 +9,7 @@ import '../../shared/widgets/brand.dart';
 import '../../shared/widgets/common.dart';
 import '../shell/role_shell.dart';
 import '../tracking/live_track.dart';
+import '../../shared/widgets/website_link.dart';
 
 /// Representative: pickups assigned by their NGO, with directions, OTP, steps and live location.
 class RepPickups extends StatefulWidget {
@@ -143,6 +144,7 @@ class RepAccount extends StatelessWidget {
         Card(child: Column(children: [
           ListTile(leading: const Icon(Icons.smart_toy_outlined), title: const Text('AnnSetu assistant'), onTap: () => context.push('/assistant')),
           ListTile(leading: const Icon(Icons.support_agent_rounded), title: const Text('Send feedback'), onTap: () => context.push('/feedback/new')),
+          ListTile(leading: const Icon(Icons.language_rounded), title: const Text('Visit our website'), trailing: const Icon(Icons.open_in_new_rounded), onTap: () => openWebsite(context)),
           ListTile(
             leading: Icon(Icons.logout_rounded, color: Theme.of(context).colorScheme.error),
             title: const Text('Sign out'),

@@ -12,6 +12,8 @@ const STARTERS = [
 
 /* Instant answers for the most common questions (no waiting for the AI). */
 const INSTANT = [
+  [/(download|install|get|is there|have).*\b(app|apk)\b|\bapk\b|android app|mobile app|play ?store/i,
+    'Yes, AnnSetu has an **Android app**.\n- Open the **Get the App** section on the home page and tap **Download for Android**\n- If asked, allow **Install unknown apps** for your browser\n- Sign in with the **same account** you use on this website\n- You get push notifications, live tracking and chats on your phone'],
   [/(how|where).*(donate|give|list)|donat(e|ion).*(food|surplus)|post.*listing/i,
     'Donating takes a few minutes:\n- **Sign up as a Donor** and complete your profile\n- Upload your **FSSAI licence** so an admin can verify you\n- Tap **Add listing**: food, quantity, pickup-by time and a photo\n- Accept a request and give the receiver’s representative the food after checking their **OTP**'],
   [/(no|without|don.?t have).*(certificate|registration)|certificate.*(no|not)/i,

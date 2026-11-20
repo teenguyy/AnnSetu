@@ -10,3 +10,4 @@ backend/.ruff_cache
 mobile
 sql
 *.apk
+!download/*.apk

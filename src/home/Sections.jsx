@@ -345,26 +345,52 @@ export function Leaderboard() {
   );
 }
 
-/* About the app -------------------------------------------------------------------- */
+/* About the app + download ------------------------------------------------------------ */
+// The APKs are served by this site from /download (see vercel.json for the download headers).
+// Build them with: cd mobile && flutter build apk --release --split-per-abi, then copy
+// app-arm64-v8a-release.apk -> download/AnnSetu.apk and app-armeabi-v7a-release.apk -> download/AnnSetu-armv7.apk.
+// Always ship split APKs from now on: their versionCode (1000s/2000s) is higher than a universal build's.
+export const APP_RELEASE = { version: '1.0.6', size: '23 MB', sizeV7: '21 MB', minAndroid: '7.0', href: 'download/AnnSetu.apk', hrefV7: 'download/AnnSetu-armv7.apk' };
+
 export function AppAbout() {
+  const r = APP_RELEASE;
   return (
     <section className="appabout" id="app" aria-labelledby="app-h">
       <div className="wrap app-grid">
         <div>
           <span className="kick">The AnnSetu app</span>
           <h2 id="app-h" data-reveal="clip">AnnSetu, <em>in your pocket</em></h2>
-          <p className="lead" data-reveal>An Android app for donors, receivers and representatives, built on the same secure account as this website.</p>
+          <p className="lead" data-reveal>The Android app for donors, NGOs and representatives. Sign in with the same account you use here, and everything stays in sync with the website.</p>
           <ul className="app-feats" data-reveal>
             <li><b>Post surplus food in seconds</b> with a photo, quantity and pickup window.</li>
             <li><b>Push notifications</b> when food is nearby, a request is accepted or your representative is on the way.</li>
-            <li><b>Representative mode</b> with turn-by-turn directions, the pickup OTP and live location.</li>
-            <li><b>Same login</b>: everything stays in sync with the website.</li>
+            <li><b>Live tracking on the map</b>: representatives get directions, the pickup OTP and share their location.</li>
+            <li><b>Private chats and calls</b> between donor, NGO and representative.</li>
+            <li><b>AnnSetu assistant, dark mode</b> and your impact and certificates on the go.</li>
           </ul>
-          <p className="app-status" data-reveal><span className="tag pending">In development</span> We’ll share the download link here when it is published. Until then, the website works fully on phones.</p>
+          <div className="app-dl" data-reveal>
+            <a className="btn primary app-dl-btn" href={r.href} download="AnnSetu.apk">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.6 9.48l1.84-3.18a.38.38 0 0 0-.66-.38l-1.86 3.22a11.4 11.4 0 0 0-9.84 0L5.22 5.92a.38.38 0 0 0-.66.38L6.4 9.48A10.8 10.8 0 0 0 1 18h22a10.8 10.8 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z" /></svg>
+              <span>Download for Android</span>
+            </a>
+            <span className="app-meta">Version {r.version} · {r.size} · Android {r.minAndroid}+</span>
+          </div>
+          <details className="app-help" data-reveal>
+            <summary>How to install</summary>
+            <ol>
+              <li>Tap <b>Download for Android</b> on your phone and open the file when it finishes.</li>
+              <li>If Android asks, allow <b>Install unknown apps</b> for your browser. The app is not on Play Store yet.</li>
+              <li>Tap <b>Install</b>, open AnnSetu and sign in with your website account.</li>
+            </ol>
+            <p className="app-meta">Older phone and the install fails? Try the <a href={r.hrefV7} download="AnnSetu-armv7.apk">32-bit version ({r.sizeV7})</a>.</p>
+          </details>
         </div>
-        <div className="app-phone" aria-hidden="true">
-          <div className="phone"><div className="ph-top" /><div className="ph-card"><b>Veg biryani · 40 portions</b><span>Hotel Sunrise · 1.2 km</span><i>Request</i></div>
-            <div className="ph-card alt"><b>Ravi is on the way</b><span>ETA 6:40 PM</span></div><div className="ph-otp">OTP <b>4 8 1 7</b></div></div>
+        <div className="app-phone">
+          <div className="phone shot"><img src="assets/landing/app-screen.webp" width="390" height="844" loading="lazy" alt="The AnnSetu app welcome screen: one hand passing an apple to another" /></div>
+          <figure className="app-qr">
+            <img src="assets/landing/app-qr.svg" width="112" height="112" loading="lazy" alt="QR code to download the AnnSetu Android app" />
+            <figcaption>On a computer? Scan to download on your phone.</figcaption>
+          </figure>
         </div>
       </div>
     </section>

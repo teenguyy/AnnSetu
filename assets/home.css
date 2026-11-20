@@ -418,6 +418,23 @@
 .ph-card.alt { background: var(--sky-l); color: var(--ink); }
 .ph-otp { margin-top: 6px; text-align: center; color: var(--on-dark); font: 600 .78rem var(--f-grot); letter-spacing: .1em; }
 .ph-otp b { display: block; font: 700 1.6rem var(--f-syne); color: var(--sun); letter-spacing: .2em; }
+/* real app screenshot inside the phone frame */
+.phone.shot { padding: 10px; aspect-ratio: auto; display: block; }
+.phone.shot img { display: block; width: 100%; height: auto; border-radius: 30px; }
+.app-phone { gap: 1.6rem; }
+.app-dl { display: flex; align-items: center; gap: .9rem 1.2rem; flex-wrap: wrap; margin-top: 1.6rem; }
+.app-dl-btn { min-height: 54px; padding: .9rem 1.6rem; font-size: 1rem; }
+.app-dl-btn svg { width: 1.35em; height: 1.35em; }
+.app-meta { color: var(--muted); font: 500 .86rem var(--f-grot); }
+.app-meta a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.app-help { margin-top: 1.2rem; max-width: 52ch; border-top: 1px solid var(--line-2); padding-top: .9rem; }
+.app-help summary { cursor: pointer; font: 600 .95rem var(--f-grot); width: fit-content; }
+.app-help summary:focus-visible { outline: 2px solid var(--ocean); outline-offset: 4px; border-radius: 6px; }
+.app-help ol { margin: .8rem 0; padding-left: 1.2rem; display: grid; gap: .45rem; line-height: 1.5; }
+.app-qr { display: flex; align-items: center; gap: .9rem; margin: 0; max-width: 300px; }
+.app-qr img { border-radius: 14px; background: #fff; padding: 6px; box-shadow: 0 8px 24px -12px rgba(16,47,70,.45); }
+.app-qr figcaption { color: var(--muted); font-size: .86rem; line-height: 1.4; }
+@media (hover: none) and (pointer: coarse) { .app-qr { display: none; } }
 @keyframes phoneFloat { 0%, 100% { transform: rotate(-4deg) translateY(0); } 50% { transform: rotate(-3deg) translateY(-10px); } }
 @media (max-width: 860px) { .app-grid { grid-template-columns: 1fr; } .lb-item { grid-template-columns: 2.8rem 1fr; } .lb-num { grid-column: 2; text-align: left; } }
 @media (prefers-reduced-motion: reduce) { .phone { animation: none; } }

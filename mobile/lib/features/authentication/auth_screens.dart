@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/format.dart';
 import '../../shared/widgets/brand.dart';
 import '../../shared/widgets/common.dart';
+import '../../shared/widgets/website_link.dart';
 
 /// Shared layout: forest header with the brand, cream sheet with the form.
 class _AuthScaffold extends StatelessWidget {
@@ -162,6 +163,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 const Text('New to AnnSetu?'),
                 TextButton(onPressed: () => context.go('/register'), child: const Text('Create an account')),
               ]),
+              Center(child: TextButton.icon(onPressed: () => openWebsite(context), icon: const Icon(Icons.language_rounded, size: 18), label: const Text('Visit our website'))),
             ]),
           ),
         ),

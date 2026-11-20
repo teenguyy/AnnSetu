@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/domain.dart';
-import '../../core/constants/env.dart';
 import '../../core/models/models.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/notification_service.dart';
@@ -15,6 +13,7 @@ import '../../core/utils/format.dart';
 import '../../shared/components/pickers.dart';
 import '../../shared/widgets/common.dart';
 import '../shell/role_shell.dart';
+import '../../shared/widgets/website_link.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -32,6 +31,7 @@ class ProfileScreen extends StatelessWidget {
             if (s.org != null) _Documents(org: s.org!),
             if (s.org != null) _Representatives(org: s.org!),
           ],
+          const Padding(padding: EdgeInsets.fromLTRB(16, 16, 16, 0), child: WebsiteCard()),
           const SectionTitle('Settings & support'),
           const _ThemePicker(),
           ListTile(leading: const Icon(Icons.rate_review_outlined), title: const Text('Feedback & support'),
@@ -39,11 +39,6 @@ class ProfileScreen extends StatelessWidget {
           ListTile(leading: const Icon(Icons.notifications_outlined), title: const Text('Notifications'), trailing: const Icon(Icons.chevron_right_rounded), onTap: () => context.push('/notifications')),
           if (s.role == Role.ngo)
             ListTile(leading: const Icon(Icons.campaign_outlined), title: const Text('Community needs'), trailing: const Icon(Icons.chevron_right_rounded), onTap: () => context.push('/needs')),
-          ListTile(
-            leading: const Icon(Icons.language_rounded), title: const Text('Open AnnSetu website'),
-            subtitle: const Text('Same account and data in your browser'), trailing: const Icon(Icons.open_in_new_rounded),
-            onTap: () => launchUrl(Uri.parse(Env.websiteUrl), mode: LaunchMode.externalApplication),
-          ),
           const SizedBox(height: 8),
           Pad(BusyButton(outlined: true, danger: true, icon: Icons.logout_rounded, expand: true, onPressed: () async {
             if (!await confirm(context, title: 'Sign out of AnnSetu?', text: 'You’ll need to sign in again to manage listings, requests and pickups.', cta: 'Sign out', danger: true)) return;

@@ -89,6 +89,7 @@ function Nav({ session }) {
     ['donate', 'Donate', role === 'donor' ? 'donor.html#listings' : 'signin.html?role=donor&view=register'],
     ['mission', 'About', '#mission'],
     ['impact', 'Impact', '#impact'],
+    ['app', 'Get the App', '#app'],
     ['join', 'Contact', '#join'],
   ];
   useEffect(() => {
@@ -96,7 +97,7 @@ function Nav({ session }) {
     on();
     addEventListener('scroll', on, { passive: true });
     const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) setActive(e.target.id); }), { rootMargin: '-45% 0px -50% 0px' });
-    ['home', 'discover', 'mission', 'impact', 'join'].forEach((id) => { const el = document.getElementById(id); if (el) io.observe(el); });
+    ['home', 'discover', 'mission', 'impact', 'app', 'join'].forEach((id) => { const el = document.getElementById(id); if (el) io.observe(el); });
     const k = (e) => { if ((e.key === '/' || (e.key === 'k' && (e.metaKey || e.ctrlKey))) && !/input|textarea/i.test(document.activeElement?.tagName)) { e.preventDefault(); setSearch(true); } };
     addEventListener('keydown', k);
     return () => { removeEventListener('scroll', on); removeEventListener('keydown', k); io.disconnect(); };
