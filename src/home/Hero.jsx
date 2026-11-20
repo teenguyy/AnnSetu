@@ -41,55 +41,21 @@ export function HeroHands() {
       </g>
       <path id="hdDotPath" d="M70 250 C 120 120, 260 80, 360 150" fill="none" stroke="none" />
 
-      {/* receiver */}
+      {/* real hands from the AnnSetu reference artwork (cut out, transparent); sleeve ends fade out */}
+      <defs>
+        <linearGradient id="fadeL" x1="0" x2="1" y1="0" y2="0"><stop offset=".14" stopColor="#fff" stopOpacity="0" /><stop offset=".42" stopColor="#fff" stopOpacity="1" /></linearGradient>
+        <linearGradient id="fadeT" x1="0" x2="0" y1="0" y2="1"><stop offset=".02" stopColor="#fff" stopOpacity="0" /><stop offset=".34" stopColor="#fff" stopOpacity="1" /></linearGradient>
+        <mask id="mRecv" maskContentUnits="objectBoundingBox"><rect width="1" height="1" fill="url(#fadeL)" /></mask>
+        <mask id="mGive" maskContentUnits="objectBoundingBox"><rect width="1" height="1" fill="url(#fadeT)" /></mask>
+      </defs>
       <g className="hd-receiver">
-        <g filter="url(#hgSoft)">
-          <path d="M-80 572 L-30 690 L134 612 L108 528 Z" fill="#2F5577" />
-          <g fill="none" stroke="#3E6A90" strokeWidth="3" opacity=".55"><path d="M-40 590 L112 540" /><path d="M-30 616 L120 566" /></g>
-          <g filter="url(#hgGrain)">
-            <path d="M110 526 C 152 506, 198 486, 240 470 L 256 518 C 214 530, 172 546, 130 566 Z" fill="url(#hgArmB)" />
-            <path className="hd-palm" d="M236 468 C 262 456, 280 452, 290 446 C 294 428, 300 410, 310 398 C 316 390, 327 392, 324 403 C 320 418, 318 432, 324 444 C 350 436, 392 424, 432 418 C 447 416, 451 429, 438 433 C 420 437, 400 440, 382 444 C 410 444, 436 444, 452 446 C 465 448, 463 461, 450 461 C 428 462, 404 462, 386 462 C 410 466, 430 470, 441 474 C 451 478, 447 489, 436 487 C 418 484, 400 482, 384 480 C 398 486, 410 492, 415 496 C 421 503, 412 509, 404 505 C 384 498, 366 498, 350 502 C 320 512, 286 520, 256 518 C 246 516, 240 506, 236 468 Z" fill="url(#hgBot)" />
-            <g fill="none" stroke="#5A5957" strokeWidth="1.6" opacity=".5" strokeLinecap="round">
-              <path d="M268 492 C 294 486, 320 474, 340 458" /><path d="M286 508 C 308 502, 330 492, 350 480" />
-              <path d="M352 450 C 360 448, 370 446, 380 445" /><path d="M360 464 C 368 463, 376 463, 384 463" /><path d="M362 480 C 368 480, 374 481, 382 481" />
-            </g>
-            <path d="M236 468 C 262 456, 280 452, 290 446 C 330 440, 360 470, 350 502 C 320 512, 286 520, 256 518 C 246 516, 240 506, 236 468 Z" fill="url(#hgDots)" />
-          </g>
-          <path d="M196 486 C 202 504, 208 522, 212 538" stroke="#2A221C" strokeWidth="7" fill="none" strokeLinecap="round" strokeDasharray="1 7" />
-          <path d="M200 484 C 206 502, 212 520, 216 536" stroke="#5A4636" strokeWidth="2.4" fill="none" />
-          <path className="hd-tassel" d="M214 536 C 216 552, 214 566, 210 576" stroke="#2A221C" strokeWidth="2" fill="none" />
-          <circle cx="210" cy="578" r="3.5" fill="#2A221C" />
-        </g>
+        <image href="assets/landing/hand-receiver.webp" x="-120" y="262" width="660" height="331" mask="url(#mRecv)" preserveAspectRatio="xMidYMid meet" />
       </g>
-
-      {/* giver + apple */}
       <g className="hd-giver">
-        <g className="hd-apple" filter="url(#hgSoft)">
-          <g transform="translate(-26 22)">
-            <path d="M432 238 C 404 220, 358 226, 350 270 C 342 312, 368 362, 406 370 C 420 373, 426 366, 434 366 C 442 366, 450 373, 464 370 C 500 362, 522 312, 514 270 C 506 226, 460 220, 432 238 Z" fill="url(#hgApple)" />
-            <g opacity=".2" stroke="#FFD9A8" strokeWidth="2" fill="none" strokeLinecap="round"><path d="M376 266 C 370 296, 376 324, 390 346" /><path d="M398 252 C 392 286, 394 318, 404 350" /><path d="M470 254 C 482 286, 484 318, 478 348" /><path d="M490 262 C 500 290, 500 318, 492 340" /></g>
-            <ellipse className="hd-shine" cx="390" cy="276" rx="12" ry="24" fill="#fff" opacity=".33" transform="rotate(18 390 276)" />
-            <path d="M432 240 C 433 228, 436 218, 442 210" stroke="#4A2E1A" strokeWidth="4.5" fill="none" strokeLinecap="round" />
-          </g>
-        </g>
-        <g filter="url(#hgSoft)">
-          <path d="M650 -40 L720 30 L600 150 L548 92 Z" fill="#1C2C3A" />
-          <path d="M626 70 L 606 150" stroke="#2C4256" strokeWidth="3" />
-          <g filter="url(#hgGrain)">
-            <path d="M560 92 C 586 104, 604 118, 612 136 C 596 150, 580 162, 566 172 L 520 128 C 534 116, 546 104, 560 92 Z" fill="url(#hgArmT)" />
-            <path d="M440 194 C 414 194, 392 204, 374 222 C 362 234, 360 250, 369 255 C 378 260, 385 250, 391 239 C 401 223, 416 214, 434 212 Z" fill="url(#hgTop)" />
-            <path d="M552 104 C 528 116, 500 136, 474 156 C 452 172, 432 184, 414 194 C 398 202, 386 214, 383 230 C 379 247, 385 264, 397 272 C 405 277, 415 273, 413 262 C 410 249, 411 236, 420 228 C 429 241, 435 259, 440 274 C 445 286, 458 284, 458 272 C 457 256, 453 238, 457 224 C 466 238, 474 252, 480 263 C 486 273, 497 269, 495 259 C 491 245, 489 232, 494 221 C 502 231, 508 240, 514 245 C 520 249, 527 243, 523 235 C 518 224, 521 210, 531 198 C 545 184, 560 172, 584 158 Z" fill="url(#hgTop)" />
-            <g fill="none" stroke="#5A5957" strokeWidth="1.6" opacity=".55" strokeLinecap="round">
-              <path d="M418 226 C 412 214, 418 204, 430 200" /><path d="M455 222 C 452 210, 458 202, 470 198" /><path d="M492 219 C 492 208, 498 202, 508 198" />
-              <path d="M398 250 C 402 252, 407 252, 410 250" /><path d="M440 258 C 444 261, 450 261, 454 258" /><path d="M482 248 C 486 250, 490 250, 493 248" />
-              <path d="M470 176 C 486 168, 504 166, 520 170" />
-            </g>
-            <path d="M552 104 C 528 116, 500 136, 474 156 C 452 172, 432 184, 414 194 C 440 210, 500 220, 531 198 C 545 184, 560 172, 584 158 Z" fill="url(#hgDots)" />
-          </g>
-        </g>
+        <image href="assets/landing/hand-giver.webp" x="262" y="-150" width="510" height="340" mask="url(#mGive)" preserveAspectRatio="xMidYMid meet" />
       </g>
       {/* the little spark that appears when the hands come closest */}
-      <g className="hd-meet" transform="translate(372 418)" opacity="0">
+      <g className="hd-meet" transform="translate(395 268)" opacity="0">
         <path d="M0 -14 L2 -2 L14 0 L2 2 L0 14 L-2 2 L-14 0 L-2 -2 Z" fill="#FFE28A" />
       </g>
     </svg>
@@ -247,7 +213,6 @@ export default function Hero({ donateHref }) {
     const idle = [
       gsap.to('.hd-giver', { y: 7, x: -3, duration: 3.2, ease: 'sine.inOut', yoyo: true, repeat: -1, delay: 2.4 }),
       gsap.to('.hd-receiver', { y: -6, x: 3, duration: 3.6, ease: 'sine.inOut', yoyo: true, repeat: -1, delay: 2.5 }),
-      gsap.to('.hd-apple', { rotate: 3, transformOrigin: '420px 300px', duration: 2.6, ease: 'sine.inOut', yoyo: true, repeat: -1, delay: 2.4 }),
       gsap.to('.hd-tassel', { rotate: 6, transformOrigin: '214px 536px', duration: 1.8, ease: 'sine.inOut', yoyo: true, repeat: -1 }),
       gsap.to('.hd-star', { scale: 1.25, opacity: 0.7, transformOrigin: '50% 50%', duration: 1.4, ease: 'sine.inOut', yoyo: true, repeat: -1 }),
       gsap.to('.hd-dot', { motionPath: { path: '#hdDotPath', align: '#hdDotPath', alignOrigin: [0.5, 0.5] }, duration: 5, ease: 'none', repeat: -1 }),

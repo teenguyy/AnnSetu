@@ -5,7 +5,8 @@ import { need, loadReceiver, loadDiscover, subscribe, markAllRead } from './data
 import { Shell, PageHead, Hero } from './shell.jsx';
 import { Btn, AsyncForm, Field, Card, Tag, Empty, Bar, Stat, Skeleton, useToast, useLoader, useHashTab } from './ui.jsx';
 import { DiscoverBoard } from './discover.jsx';
-import { VerifyBanner, canAct, profileComplete, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity, TripStatus, LocationShare, CallLink, mapsLink } from './shared.jsx';
+import { VerifyBanner, canAct, profileComplete, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity, mapsLink } from './shared.jsx';
+import { LiveTrack } from './LiveTrack.jsx';
 
 const TABS = ['overview', 'discover', 'requests', 'pickups', 'needs', 'impact', 'profile'];
 
@@ -25,6 +26,7 @@ export default function Receiver({ me }) {
   const done = requests.filter((r) => r.status === 'completed');
   const pending = requests.filter((r) => r.status === 'pending');
   const accepted = requests.filter((r) => r.status === 'accepted');
+  const onWay = requests.filter((r) => r.status === 'completed' && r.trip_status === 'collected');
   const stats = { donations: done.length, units: done.reduce((a, r) => a + r.quantity, 0), partners: new Set(done.map((r) => r.listing?.donor_org_id)).size };
   const openNeeds = needs.filter((n) => n.status === 'open');
   const tabs = [
@@ -87,11 +89,13 @@ export default function Receiver({ me }) {
       <Card key={r.id} i={i}>
         <div className="row"><div><h3>{r.listing?.title}</h3><span className="m">{r.donor?.name} · {r.donor?.address || 'address on request'} · collect {r.quantity} · rep: {r.rep_name}</span></div><Tag s="accepted" /></div>
         <div className="otpbox"><span className="m">Pickup OTP, show it to the donor</span><div className="otpv">{otps[r.id]?.otp || '····'}</div>{otps[r.id] && <small className="m">Valid until {fmtDT(otps[r.id].expires_at)}</small>}</div>
-        <TripStatus request={r} canUpdate onChanged={refresh} />
-        <LocationShare request={r} />
-        <div className="acts"><Btn size="sm" kind="ghost" onClick={() => setChat(r)}><FiMessageSquare /> Message</Btn><CallLink phone={r.donor?.phone} label="Call donor" />{mapsLink(r.donor) && <a className="btn ghost sm" href={mapsLink(r.donor)} target="_blank" rel="noopener noreferrer"><FiNavigation /> Directions</a>}<Btn size="sm" kind="danger" onClick={cancel(r)}>Cancel pickup</Btn></div>
+        <LiveTrack request={r} donor={r.donor} ngo={org} viewer="ngo" onChat={() => setChat(r)} />
+        <div className="acts">{mapsLink(r.donor) && <a className="btn ghost sm" href={mapsLink(r.donor)} target="_blank" rel="noopener noreferrer"><FiNavigation /> Donor on Google Maps</a>}<Btn size="sm" kind="danger" onClick={cancel(r)}>Cancel pickup</Btn></div>
       </Card>
     ))}
+    {onWay.length > 0 && <h3 className="sec">Coming to you</h3>}
+    {onWay.map((r, i) => <Card key={r.id} i={i}><div className="row"><div><h3>{r.listing?.title}</h3><span className="m">{r.donor?.name} · {r.quantity} units</span></div><Tag s="approved">collected</Tag></div>
+      <LiveTrack request={r} donor={r.donor} ngo={org} viewer="ngo" onChat={() => setChat(r)} /></Card>)}
   </>);
 
   const addNeed = async (fd, form) => {

@@ -24,8 +24,13 @@ Return one JSON object with exactly these keys:
  "signatory": string|null,
  "legible": true|false,
  "red_flags": [short strings, e.g. "edited text", "cropped", "photo of a screen"],
+ "genuine_assessment": one of "likely_genuine","uncertain","likely_fake",
+ "genuine_reasons": [short strings explaining the assessment: official logo/emblem/seal present or missing, QR code,
+                     consistent fonts, signature, signs of digital editing, placeholder numbers like 1234567890],
  "notes": short string
-}"""
+}
+Judge genuineness ONLY from what is visible. A plain typed page without logos, seals or signatures is not
+an official certificate."""
 
 DOC_TYPES_FOR = {
     "donor": {"fssai_licence", "fssai_registration", "gst", "trust_deed", "society_registration", "section_8", "id_proof"},
@@ -57,6 +62,35 @@ def _date(v: str | None) -> date | None:
             return datetime.strptime(v.strip(), fmt).date()
         except ValueError:
             continue
+    return None
+
+
+FOSCOS = "https://foscos.fssai.gov.in/"
+DARPAN = "https://ngodarpan.gov.in/"
+INCOME_TAX = "https://eportal.incometax.gov.in/iec/foservices/#/pre-login/verifyYourPAN"
+
+
+def registry_check(dtype: str, num: str) -> dict | None:
+    """Format rules of Indian registries + the official place to confirm the number.
+    The public registries have no open API, so the admin confirms there with one click."""
+    if dtype in ("fssai_licence", "fssai_registration"):
+        # 14 digits: 1st = 1 (central) / 2 (state) / 3 (registration)..., 2-3 = state code (01-38), 4-5 = year
+        if re.fullmatch(r"[1-4](0[1-9]|[1-3]\d)\d{11}", num):
+            return {"check": "FSSAI registry format", "result": "pass",
+                    "detail": f"Valid FSSAI structure. Confirm it is active on FoSCoS: {FOSCOS}"}
+        return {"check": "FSSAI registry format", "result": "fail",
+                "detail": f'"{num or "missing"}" does not follow the FSSAI 14-digit structure.'}
+    if dtype == "ngo_darpan":
+        if re.fullmatch(r"[A-Z]{2}/\d{4}/\d{7}", num.upper()):
+            return {"check": "NGO Darpan ID format", "result": "pass", "detail": f"Valid Darpan ID format. Search it on {DARPAN}"}
+        return {"check": "NGO Darpan ID format", "result": "warn", "detail": f"Darpan IDs look like MH/2017/0123456. Check on {DARPAN}"}
+    if dtype == "12a_80g":
+        if re.search(r"[A-Z]{5}\d{4}[A-Z]", num.upper()):
+            return {"check": "12A/80G (PAN-based) format", "result": "pass", "detail": f"Contains a valid PAN pattern. Verify on {INCOME_TAX}"}
+        return {"check": "12A/80G (PAN-based) format", "result": "warn", "detail": "No PAN-style number found in the 12A/80G registration."}
+    if dtype == "section_8" and num.upper().startswith("CSR"):
+        ok = re.fullmatch(r"CSR\d{8}", num.upper())
+        return {"check": "CSR-1 number format", "result": "pass" if ok else "warn", "detail": "CSR registration numbers look like CSR00012345."}
     return None
 
 
@@ -107,6 +141,21 @@ def run_checks(ex: dict, org: dict, other_numbers: list[dict], today: date | Non
         add("Registration number", "pass", f"Found {num}.")
     else:
         add("Registration number", "warn", "No registration number found.")
+
+    # 4b. official registry format + where to confirm it
+    reg = registry_check(dtype, num)
+    if reg:
+        out.append(reg)
+
+    # 4c. genuineness (AI visual assessment)
+    gen = ex.get("genuine_assessment")
+    reasons = "; ".join(str(r) for r in (ex.get("genuine_reasons") or [])[:4])
+    if gen == "likely_fake":
+        add("Looks genuine", "fail", reasons or "The document looks edited or unofficial.")
+    elif gen == "uncertain":
+        add("Looks genuine", "warn", reasons or "Could not confirm official marks.")
+    elif gen == "likely_genuine":
+        add("Looks genuine", "pass", reasons or "Official marks present.")
 
     # 5. dates
     exp, iss = _date(ex.get("expiry_date")), _date(ex.get("issue_date"))

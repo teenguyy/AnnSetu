@@ -32,17 +32,6 @@
 .hnav-sheet[hidden] { display: none; }
 .hnav-sheet a, .sheet-search { display: flex; align-items: center; gap: .8rem; padding: .9rem 0; border: 0; border-bottom: 1px solid rgba(168, 217, 233, .14); background: none; font: 500 clamp(1.7rem, 7vw, 2.4rem)/1.1 var(--f-display); color: var(--on-dark); text-decoration: none; text-align: left; cursor: pointer; }
 .hnav-sheet .sheet-acct { color: var(--sun); border: 0; margin-top: 1rem; }
-.logo .logo-text { position: relative; display: inline-flex; flex-direction: column; }
-.logo-swoosh { position: absolute; left: -6px; top: -14px; width: 118px; height: 20px; overflow: visible; }
-.logo-swoosh path:first-child { stroke: var(--sun); }
-.logo-swoosh .spark { fill: var(--sun); }
-.logo:not(.reverse) .logo-swoosh path:first-child { stroke: #E8B94A; }
-.logo:not(.reverse) .logo-swoosh .spark { fill: #E8B94A; }
-.wordmark .wm-name { font-family: var(--f-display); font-size: 1.7rem; font-weight: 600; letter-spacing: -.01em; line-height: 1; font-variation-settings: 'opsz' 96; text-transform: none; }
-.wordmark .wm-name i { font-style: italic; font-weight: 500; }
-.logo.reverse .wm-name { color: #F4ECD8; }
-.logo.reverse .wm-name b { color: var(--sun); }
-.wordmark .wm-tag { display: block; margin-top: .3rem; font: 600 .56rem var(--f-grot); letter-spacing: .26em; text-transform: uppercase; color: var(--sky-l); }
 @media (max-width: 1100px) { .hnav-links { gap: 1.2rem; } .hnav-links a { font-size: .88rem; } }
 @media (max-width: 980px) {
   .hnav-links, .hnav-in > .hnav-acct, .hnav-in > .hnav-search { display: none; }
@@ -200,7 +189,7 @@
 .jr-stage { margin: clamp(16px, 4vh, 40px) 0; }
 .jr-svg { width: 100%; height: auto; overflow: visible; display: block; }
 .jr-base { fill: none; stroke: rgba(168, 217, 233, .22); stroke-width: 2; stroke-dasharray: 6 9; }
-.jr-line { fill: none; stroke: var(--sun); stroke-width: 3.5; stroke-linecap: round; stroke-dasharray: 1; }
+.jr-line { fill: none; stroke: var(--sun); stroke-width: 3.5; stroke-linecap: round; stroke-dasharray: 0 99999; }
 .jr-node .halo { fill: transparent; stroke: rgba(168, 217, 233, .3); stroke-width: 1.5; transition: fill .5s, stroke .5s; }
 .jr-node .core { fill: var(--ink); stroke: var(--sky); stroke-width: 2.5; transition: fill .5s, stroke .5s; }
 .jr-node text { fill: var(--sky-l); font: 600 15px var(--f-grot); letter-spacing: 3px; text-transform: uppercase; transition: fill .5s; }
@@ -432,3 +421,13 @@
 @keyframes phoneFloat { 0%, 100% { transform: rotate(-4deg) translateY(0); } 50% { transform: rotate(-3deg) translateY(-10px); } }
 @media (max-width: 860px) { .app-grid { grid-template-columns: 1fr; } .lb-item { grid-template-columns: 2.8rem 1fr; } .lb-num { grid-column: 2; text-align: left; } }
 @media (prefers-reduced-motion: reduce) { .phone { animation: none; } }
+
+/* Impact numbers: quiet, humane serif. These figures are about hunger, not a scoreboard. */
+.imp dd, .fact-n b, .lb-num b, .ic-item b, .ic-item strong {
+  font-family: var(--f-display); font-weight: 400; font-style: normal; letter-spacing: -.02em;
+  font-variation-settings: 'opsz' 144, 'SOFT' 100, 'WONK' 0; font-variant-numeric: oldstyle-nums proportional-nums;
+}
+.imp dd { font-size: clamp(3rem, 6vw, 5.8rem); line-height: .95; color: #F4ECD8; }
+.imp-empty b { font-family: var(--f-display); font-weight: 300; -webkit-text-stroke: 1.5px var(--sun); }
+.fact-n b { color: #F4ECD8; font-weight: 300; }
+.imp dt small { font-style: italic; }

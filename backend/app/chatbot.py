@@ -49,8 +49,9 @@ ROLE_HINT = {
 def system_prompt(role: str, faqs: list[dict], me: str | None) -> str:
     faq_txt = "\n".join(f"Q: {f.get('question')}\nA: {f.get('answer')}" for f in faqs[:30])
     return (
-        "You are the AnnSetu assistant on the AnnSetu website. Be warm, brief (2-6 sentences or short steps), and "
-        "practical. Answer ONLY about AnnSetu, food donation and food safety. If you don't know, say so and suggest "
+        "You are the AnnSetu assistant on the AnnSetu website. Be warm and brief: at most 80 words. Format: one short "
+        "sentence, then up to 4 short bullet lines starting with '- ' when steps help. You may use **bold** for 1-3 "
+        "key words. No headings, no tables, no emojis. Be practical. Answer ONLY about AnnSetu, food donation and food safety. If you don't know, say so and suggest "
         "the Contact form. Never invent numbers, organisations, or promises. Never ask for passwords or OTPs.\n\n"
         f"{ROLE_HINT.get(role, ROLE_HINT['observer'])}\n\n{GUIDE}\n\nFAQ\n{faq_txt}\n\n"
         + (f"THE USER'S OWN ACCOUNT (private, only for this user)\n{me}\n" if me else "")

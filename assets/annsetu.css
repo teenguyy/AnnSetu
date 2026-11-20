@@ -399,7 +399,16 @@ html.is-dragging, html.is-dragging * { user-select: none; -webkit-user-select: n
 .bot-starters { display: grid; gap: .45rem; }
 .bot-starters button { text-align: left; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); padding: .6rem .8rem; border-radius: 14px; font: 500 .87rem var(--f-body); cursor: pointer; }
 .bot-starters button:hover { border-color: var(--sky); }
-.bot-bub { max-width: 86%; padding: .65rem .85rem; border-radius: 16px; line-height: 1.5; font-size: .92rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bot-bub { max-width: 88%; padding: .7rem .9rem; border-radius: 16px; line-height: 1.5; font-size: .92rem; overflow-wrap: anywhere; }
+.bot-bub.user { white-space: pre-wrap; }
+.bot-bub p { margin: 0; }
+.bot-bub p + p, .bot-bub p + ul, .bot-bub ul + p { margin-top: .45rem; }
+.bot-bub ul { margin: .4rem 0 0; padding: 0; list-style: none; display: grid; gap: .3rem; }
+.bot-bub li { position: relative; padding-left: 1.05rem; }
+.bot-bub li::before { content: ''; position: absolute; left: .1rem; top: .58em; width: 6px; height: 6px; border-radius: 50%; background: var(--ocean); }
+:root[data-theme="dark"] .bot-bub li::before { background: var(--sun); }
+.bot-bub b { font-weight: 700; }
+.bot-fast { display: inline-flex; align-items: center; gap: .25rem; margin-top: .5rem; font: 600 .7rem var(--f-grot); letter-spacing: .04em; color: var(--muted); }
 .bot-bub.user { justify-self: end; background: var(--ocean); color: #fff; border-bottom-right-radius: 4px; }
 .bot-bub.assistant { justify-self: start; background: var(--surface-2); border-bottom-left-radius: 4px; }
 .bot-bub.typing { display: inline-flex; gap: 4px; }
@@ -412,3 +421,20 @@ html.is-dragging, html.is-dragging * { user-select: none; -webkit-user-select: n
 .bot-form .btn { padding: .7rem .9rem; }
 .bot-foot { display: block; padding: 0 1rem .7rem; color: var(--muted); font-size: .72rem; }
 @media (prefers-reduced-motion: reduce) { .bot-panel { animation: none; } .bot-bub.typing i { animation: none; } }
+
+/* ===================== Logo (shared by every page) ===================== */
+.logo .logo-text { position: relative; display: inline-flex; flex-direction: column; }
+.logo-swoosh { position: absolute; left: -6px; top: -14px; width: 118px; height: 20px; overflow: visible; }
+.logo-swoosh path:first-child { stroke: var(--sun); }
+.logo-swoosh .spark { fill: var(--sun); }
+.logo:not(.reverse) .logo-swoosh path:first-child { stroke: #E8B94A; }
+.logo:not(.reverse) .logo-swoosh .spark { fill: #E8B94A; }
+.wordmark .wm-name { font-family: var(--f-display); font-size: 1.7rem; font-weight: 600; letter-spacing: -.01em; line-height: 1; font-variation-settings: 'opsz' 96; text-transform: none; }
+.wordmark .wm-name i { font-style: italic; font-weight: 500; }
+.logo.reverse .wm-name { color: #F4ECD8; }
+.logo.reverse .wm-name b { color: var(--sun); }
+.wordmark .wm-tag { display: block; margin-top: .3rem; font: 600 .56rem var(--f-grot); letter-spacing: .26em; text-transform: uppercase; color: var(--sky-l); }
+.art .logo { margin-bottom: 1rem; }
+.art .logo .wm-name { font-size: 2.3rem; }
+.art .logo .wm-tag { font-size: .66rem; margin-top: .45rem; }
+.art .logo .logo-swoosh { width: 150px; top: -18px; }

@@ -51,7 +51,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # ---- simple per-IP rate limit (fine for one instance; use Redis when scaling out) ----
     hits: dict[str, deque] = defaultdict(deque)
-    limits = {"/chat": (20, 60), "/ai/review-document": (30, 60), "/ai/review-no-cert": (30, 60)}
+    limits = {"/chat": (20, 60), "/ai/review-document": (30, 60), "/ai/review-no-cert": (30, 60), "/ai/auto-review": (10, 60)}
 
     @app.middleware("http")
     async def rate_limit(request: Request, call_next):
@@ -117,9 +117,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     class DocIn(BaseModel):
         document_id: str = Field(pattern=r"^[0-9a-fA-F-]{36}$")
 
-    @app.post("/ai/review-document")
-    async def review_document(body: DocIn, request: Request, sb: AdminDep):
-        docs = await sb.select("verification_documents", f"id=eq.{body.document_id}&select=id,org_id,path,doc_type")
+    async def analyse(sb: Supa, request: Request, document_id: str, others: list[dict]):
+        """Reads the document with the caller's own access (RLS), extracts with Gemini and runs the checks."""
+        docs = await sb.select("verification_documents", f"id=eq.{document_id}&select=id,org_id,path,doc_type")
         if not docs:
             raise HTTPException(404, "Document not found.")
         doc = docs[0]
@@ -136,17 +136,53 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(413, "Document is larger than 5 MB.")
         g = Gemini(settings, http(request))
         ex = await g.extract_json(EXTRACT_PROMPT + f"\n\nThe uploader labelled it: {doc.get('doc_type')}.", data, mime)
-        others = await sb.rpc("admin_document_numbers") or []
         checks = run_checks(ex, org, others)
         conf, rec = score(checks)
         summary = summarise(ex, org, checks, conf, rec)
+        gen = ex.get("genuine_assessment") if ex.get("genuine_assessment") in (
+            "likely_genuine", "uncertain", "likely_fake") else None
+        return doc, org, ex, checks, conf, rec, summary, gen
+
+    @app.post("/ai/auto-review")
+    async def auto_review(body: DocIn, request: Request, authorization: str | None = Header(default=None)):
+        """Called by the uploader's browser right after an upload: the summary is ready before an admin looks."""
+        tok = token_of(authorization)
+        if not tok:
+            raise HTTPException(401, "Sign in first.")
+        if not settings.ai_review_secret:
+            raise HTTPException(503, "Automatic AI review is not configured.")
+        sb = Supa(settings, http(request), tok)
+        try:
+            await sb.user()
+        except SupabaseError:
+            raise HTTPException(401, "Your session has expired. Sign in again.")
+        # duplicates across organisations are checked inside the database function
+        doc, _org, ex, checks, conf, rec, summary, gen = await analyse(sb, request, body.document_id, [])
+        review_id = await sb.rpc("save_document_review_auto", {
+            "p_secret": settings.ai_review_secret, "p_doc": doc["id"], "p_summary": summary, "p_extracted": ex,
+            "p_checks": checks, "p_confidence": conf, "p_recommendation": rec, "p_genuine": gen,
+            "p_model": settings.gemini_model,
+        })
+        return {"id": review_id, "recommendation": rec}
+
+    @app.get("/config")
+    async def public_config():
+        # Google Maps JS keys are browser keys by design; restrict them to your domains in Google Cloud.
+        return {"maps_key": settings.google_maps_api_key or None, "ai": settings.ai_enabled}
+
+    @app.post("/ai/review-document")
+    async def review_document(body: DocIn, request: Request, sb: AdminDep):
+        others = await sb.rpc("admin_document_numbers") or []
+        doc, org, ex, checks, conf, rec, summary, gen = await analyse(sb, request, body.document_id, others)
+        if gen:
+            ex = {**ex, "genuine": gen}
         review_id = await sb.rpc("save_document_review", {
             "p_org": org["id"], "p_doc": doc["id"], "p_kind": "document", "p_summary": summary,
             "p_extracted": ex, "p_checks": checks, "p_confidence": conf, "p_recommendation": rec,
             "p_model": settings.gemini_model,
         })
         return {"id": review_id, "summary": summary, "extracted": ex, "checks": checks,
-                "confidence": conf, "recommendation": rec}
+                "confidence": conf, "recommendation": rec, "genuine": gen}
 
     class OrgIn(BaseModel):
         org_id: str = Field(pattern=r"^[0-9a-fA-F-]{36}$")

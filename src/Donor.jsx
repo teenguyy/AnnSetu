@@ -4,7 +4,8 @@ import { db, CATEGORIES, uploadTo, toLocalInput, fmtDT, tleft, ago } from './lib
 import { need, loadDonor, subscribe, markAllRead } from './data.js';
 import { Shell, PageHead, Hero } from './shell.jsx';
 import { Btn, AsyncForm, Field, Card, Tag, Empty, Bar, Stat, Skeleton, useToast, useLoader, useHashTab, confetti } from './ui.jsx';
-import { VerifyBanner, canAct, profileComplete, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity, TripStatus, CallLink } from './shared.jsx';
+import { VerifyBanner, canAct, profileComplete, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity } from './shared.jsx';
+import { LiveTrack } from './LiveTrack.jsx';
 
 const TABS = ['overview', 'listings', 'requests', 'pickups', 'impact', 'profile'];
 const lstatus = (l) => (l.status === 'active' && new Date(l.pickup_by) < new Date() ? 'expired' : l.status);
@@ -27,6 +28,7 @@ export default function Donor({ me }) {
   const done = requests.filter((r) => r.status === 'completed');
   const pending = requests.filter((r) => r.status === 'pending');
   const accepted = requests.filter((r) => r.status === 'accepted');
+  const onWay = requests.filter((r) => r.status === 'completed' && r.trip_status === 'collected');
   const stats = { donations: done.length, units: done.reduce((a, r) => a + r.quantity, 0), partners: new Set(done.map((r) => r.ngo_org_id)).size };
   const active = listings.filter((l) => lstatus(l) === 'active');
   const events = [
@@ -169,7 +171,10 @@ export default function Donor({ me }) {
 
   const pickupsView = (<>
     <PageHead kicker="Handover" title="Pickups" sub="Confirm each handover with the OTP shown to the receiver." />
-    {!accepted.length ? <Empty>No accepted pickups waiting.</Empty> : accepted.map((r, i) => <PickupCard key={r.id} r={r} i={i} loc={locs[r.id]} onConfirm={confirm} onChat={() => setChat(r)} />)}
+    {!accepted.length ? <Empty>No accepted pickups waiting.</Empty> : accepted.map((r, i) => <PickupCard key={r.id} r={r} i={i} org={org} onConfirm={confirm} onChat={() => setChat(r)} />)}
+    {onWay.length > 0 && <h3 className="sec">On the way to the NGO</h3>}
+    {onWay.map((r, i) => <Card key={r.id} i={i}><div className="row"><div><h3>{r.ngo.name}</h3><span className="m">{r.quantity} × {r.listing?.title}</span></div><Tag s="approved">collected</Tag></div>
+      <LiveTrack request={r} donor={org} ngo={r.ngo} viewer="donor" onChat={() => setChat(r)} /></Card>)}
   </>);
 
   return (
@@ -189,21 +194,15 @@ export default function Donor({ me }) {
   );
 }
 
-function PickupCard({ r, i, loc, onConfirm, onChat }) {
+function PickupCard({ r, i, org, onConfirm, onChat }) {
   const [otp, setOtp] = useState('');
   return (
     <Card i={i}>
       <div className="row"><div><h3>{r.ngo.name}</h3><span className="m">{r.quantity} × {r.listing?.title} · rep: {r.rep_name || '—'}{r.rep_phone ? ` (${r.rep_phone})` : ''}</span></div><Tag s="accepted" /></div>
-      <TripStatus request={r} />
-      {loc && (
-        <div className="loc"><FiNavigation /><span>Representative location updated {ago(new Date(loc.updated_at).getTime())}</span>
-          <a className="lk" target="_blank" rel="noopener noreferrer" href={`https://www.openstreetmap.org/?mlat=${loc.lat}&mlon=${loc.lng}#map=16/${loc.lat}/${loc.lng}`}>Open map</a></div>
-      )}
-      <div className="acts">
+      <LiveTrack request={r} donor={org} ngo={r.ngo} viewer="donor" onChat={onChat} />
+      <div className="acts otp-acts">
         <input className="otp" value={otp} inputMode="numeric" maxLength={4} placeholder="4-digit OTP" aria-label="Pickup OTP" onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} />
         <Btn size="sm" onClick={onConfirm(r, () => otp)}>Confirm collection</Btn>
-        <Btn size="sm" kind="ghost" onClick={onChat}><FiMessageSquare /> Message</Btn>
-        <CallLink phone={r.rep_phone} label="Call representative" />
       </div>
     </Card>
   );

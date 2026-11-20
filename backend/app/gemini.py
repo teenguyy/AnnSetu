@@ -18,12 +18,15 @@ class Gemini:
         self.s = settings
         self.c = client
 
-    async def chat(self, messages: list[dict], *, json_mode: bool = False, temperature: float = 0.2) -> str:
+    async def chat(self, messages: list[dict], *, json_mode: bool = False, temperature: float = 0.2,
+                   reasoning: str | None = "none") -> str:
         if not self.s.ai_enabled:
             raise AIUnavailable("AI is not configured (GEMINI_API_KEY is missing).")
         body: dict[str, Any] = {"model": self.s.gemini_model, "messages": messages, "temperature": temperature}
         if json_mode:
             body["response_format"] = {"type": "json_object"}
+        if reasoning:
+            body["reasoning_effort"] = reasoning  # "none" keeps answers fast (about 1 s)
         last: Exception | None = None
         models = [self.s.gemini_model] + [m for m in [self.s.gemini_fallback_model] if m and m != self.s.gemini_model]
         for model in [models[0], *models]:  # primary twice, then the fallback model
@@ -50,7 +53,7 @@ class Gemini:
         if file_bytes is not None:
             b64 = base64.b64encode(file_bytes).decode()
             content.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
-        raw = await self.chat([{"role": "user", "content": content}], json_mode=True, temperature=0)
+        raw = await self.chat([{"role": "user", "content": content}], json_mode=True, temperature=0, reasoning="low")
         return parse_json(raw)
 
 

@@ -45,15 +45,17 @@
       const reps = db.representatives.filter((x) => x.user_id === uid()).map((x) => x.id);
       return { data: db.food_requests.filter((r) => reps.includes(r.rep_id) && ['accepted', 'completed'].includes(r.status)).map((r) => {
         const l = db.food_listings.find((x) => x.id === r.listing_id), d = org(l.donor_org_id), n = org(r.ngo_org_id), o = db.pickup_otps.find((x) => x.request_id === r.id);
-        return { request_id: r.id, status: r.status, trip_status: r.trip_status || 'assigned', eta: r.eta || null, quantity: r.quantity, listing_title: l.title, unit: l.unit, category: l.category, pickup_by: l.pickup_by, safety_notes: l.safety_notes, photo_path: l.photo_path, donor_name: d.name, donor_phone: d.phone, donor_address: d.address, donor_lat: d.lat, donor_lng: d.lng, ngo_name: n.name, ngo_phone: n.phone, otp: r.status === 'accepted' && o ? o.otp : null, created_at: r.created_at };
+        return { request_id: r.id, status: r.status, trip_status: r.trip_status || 'assigned', eta: r.eta || null, quantity: r.quantity, listing_title: l.title, unit: l.unit, category: l.category, pickup_by: l.pickup_by, safety_notes: l.safety_notes, photo_path: l.photo_path, donor_name: d.name, donor_phone: d.phone, donor_address: d.address, donor_lat: d.lat, donor_lng: d.lng, ngo_name: n.name, ngo_phone: n.phone, ngo_address: n.address, ngo_lat: n.lat, ngo_lng: n.lng, trip_started_at: r.trip_started_at, arrived_at: r.arrived_at, collected_at: r.collected_at, delivered_at: r.delivered_at, trip_updated_at: r.trip_updated_at, otp: r.status === 'accepted' && o ? o.otp : null, created_at: r.created_at };
       }), error: null };
     },
     set_trip_status(a) {
       const r = db.food_requests.find((x) => x.id === a.p_request); if (!r) return err('Request not found');
       const isRep = db.representatives.find((x) => x.id === r.rep_id && x.user_id === uid());
       if (!isRep && org(r.ngo_org_id).owner_id !== uid()) return err('Only the assigned representative or the NGO can update this pickup');
-      if (r.status !== 'accepted') return err('This pickup is not active');
+      if (a.p_status === 'delivered') { if (r.status !== 'completed' || r.trip_status !== 'collected') return err('Mark delivered only after the donor has confirmed the OTP'); }
+      else if (r.status !== 'accepted') return err('This pickup is not active');
       r.trip_status = a.p_status; r.eta = a.p_eta || (a.p_status === 'arrived' ? now() : r.eta); r.trip_updated_at = now();
+      if (a.p_status === 'on_the_way') r.trip_started_at = r.trip_started_at || now(); if (a.p_status === 'arrived') r.arrived_at = now(); if (a.p_status === 'delivered') r.delivered_at = now();
       const l = db.food_listings.find((x) => x.id === r.listing_id);
       const msg = (r.rep_name || 'The representative') + (a.p_status === 'on_the_way' ? ' is on the way' : ' has arrived') + ' for "' + l.title + '"';
       notify(l.donor_org_id, 'Pickup update', msg); notify(r.ngo_org_id, 'Pickup update', msg); return { data: null, error: null };
@@ -113,7 +115,7 @@
     confirm_pickup(a) {
       const r = db.food_requests.find((x) => x.id === a.p_request), l = db.food_listings.find((x) => x.id === r.listing_id), o = db.pickup_otps.find((x) => x.request_id === r.id);
       if (!o) return err('No active OTP for this request'); if (o.otp !== a.p_otp) { o.attempts++; return { data: false, error: null }; }
-      r.status = 'completed'; r.completed_at = now(); db.pickup_otps = db.pickup_otps.filter((x) => x.request_id !== r.id);
+      r.status = 'completed'; r.completed_at = now(); r.trip_status = 'collected'; r.collected_at = now(); db.pickup_otps = db.pickup_otps.filter((x) => x.request_id !== r.id);
       if (l.qty_reserved === l.quantity) l.status = 'completed'; award(l.donor_org_id); award(r.ngo_org_id); notify(r.ngo_org_id, 'Pickup confirmed', l.title); return { data: true, error: null };
     },
     review_org(a) {

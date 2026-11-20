@@ -64,6 +64,13 @@ function ReasonModal({ title, label, cta, required = true, onSubmit, onClose }) 
 }
 
 const REC = { looks_valid: ['approved', 'Looks valid'], needs_review: ['pending', 'Needs a closer look'], likely_invalid: ['rejected', 'Likely invalid'] };
+const GEN = { likely_genuine: 'Looks genuine', uncertain: 'Genuineness unclear', likely_fake: 'Looks fake or edited' };
+function AIVerdict({ review }) {
+  if (!review) return <span className="ai-chip wait"><FiCpu /> AI check pending</span>;
+  const ok = review.recommendation === 'looks_valid' && review.genuine !== 'likely_fake';
+  const bad = review.recommendation === 'likely_invalid' || review.genuine === 'likely_fake';
+  return <span className={'ai-chip ' + (ok ? 'ok' : bad ? 'bad' : 'warn')}><FiCpu /> {ok ? 'AI verified' : bad ? 'AI flagged' : 'AI: check manually'}{review.confidence != null ? ` · ${review.confidence}/100` : ''}</span>;
+}
 function AIReview({ review }) {
   if (!review) return null;
   const [cls, label] = REC[review.recommendation] || ['', review.recommendation];
@@ -72,10 +79,10 @@ function AIReview({ review }) {
     ['Issued by', ex.issuing_authority], ['Valid until', ex.expiry_date], ['Address', ex.address]].filter((r) => r[1]);
   return (
     <div className="ai-rev">
-      <div className="ai-head"><FiCpu /><b>AI summary</b><Tag s={cls}>{label}</Tag>{review.confidence != null && <span className="ai-conf" title="Confidence"><i style={{ width: review.confidence + '%' }} />{review.confidence}/100</span>}</div>
+      <div className="ai-head"><FiCpu /><b>AI overview</b><Tag s={cls}>{label}</Tag>{review.genuine && <Tag s={review.genuine === 'likely_genuine' ? 'approved' : review.genuine === 'likely_fake' ? 'rejected' : 'pending'}>{GEN[review.genuine]}</Tag>}{review.confidence != null && <span className="ai-conf" title="Confidence"><i style={{ width: review.confidence + '%' }} />{review.confidence}/100</span>}</div>
       <p>{review.summary}</p>
       {rows.length > 0 && <dl className="ai-fields">{rows.map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}</dl>}
-      {(review.checks || []).length > 0 && <ul className="ai-checks">{review.checks.map((c, i) => <li key={i} className={c.result}><b>{c.check}</b> {c.detail}</li>)}</ul>}
+      {(review.checks || []).length > 0 && <ul className="ai-checks">{review.checks.map((c, i) => <li key={i} className={c.result}><b>{c.check}</b> {String(c.detail || '').split(/(https?:\/\/[^\s]+)/g).map((t, j) => (/^https?:\/\//.test(t) ? <a key={j} href={t} target="_blank" rel="noopener noreferrer">{t.replace(/^https?:\/\//, '').split('/')[0]}</a> : t))}</li>)}</ul>}
       <small className="m">{review.model ? 'Model ' + review.model + ' · ' : ''}{fmtDT(review.created_at)} · AI never approves: you decide.</small>
     </div>
   );
@@ -92,6 +99,8 @@ export default function Admin({ me }) {
   const [rf, setRf] = useState('all');
   const [modal, setModal] = useState(null);
   const [notesById, setNotes] = useState({});
+  const [reopen, setReopen] = useState({});
+  const [aiOpen, setAiOpen] = useState({});
   useEffect(() => subscribe(uid, refresh), [uid]); // eslint-disable-line
 
   if (error) return <div className="fatal"><h1>Couldn’t load the admin console</h1><p>{error.message}</p><button className="btn primary" onClick={refresh}>Try again</button></div>;
@@ -155,16 +164,22 @@ export default function Admin({ me }) {
               <FiEye /><div><b>{(DOC_TYPES.find((x) => x[0] === d.doc_type) || [0, d.doc_type])[1]}</b><small>{fmtD(d.created_at)}{d.reviewer_note ? ' · ' + d.reviewer_note : ''}</small></div>
               <Tag s={d.status} />
               <Btn size="sm" kind="ghost" onClick={() => viewDoc(d)}>Open</Btn>
-              {d.status !== 'approved' && <Btn size="sm" kind="ok" onClick={rpc('review_document', { p_doc: d.id, p_status: 'approved', p_note: null }, 'Document approved')}><FiCheck /></Btn>}
-              {d.status !== 'rejected' && <Btn size="sm" kind="danger" onClick={() => setModal({ title: 'Reject document', label: 'Why is this document rejected?', cta: 'Reject document', run: async (r) => { need(await db.rpc('review_document', { p_doc: d.id, p_status: 'rejected', p_note: r })); toast('Document rejected'); await refresh(); } })}><FiX /></Btn>}
-              <Btn size="sm" kind="ghost" disabled={!apiReady()} title={aiHint} onClick={runAI('/ai/review-document', { document_id: d.id }, 'AI check complete')}><FiCpu /> {latestFor((r) => r.document_id === d.id) ? 'Re-check' : 'AI check'}</Btn>
-              <div className="doc-ai"><AIReview review={latestFor((r) => r.document_id === d.id)} /></div>
+              <AIVerdict review={latestFor((r) => r.document_id === d.id)} />
+              {latestFor((r) => r.document_id === d.id)
+                ? <Btn size="sm" kind="ghost" onClick={() => setAiOpen({ ...aiOpen, [d.id]: !aiOpen[d.id] })} aria-expanded={!!aiOpen[d.id]}><FiCpu /> {aiOpen[d.id] ? 'Hide AI overview' : 'AI overview'}</Btn>
+                : <Btn size="sm" kind="ghost" disabled={!apiReady()} title={aiHint} onClick={runAI('/ai/review-document', { document_id: d.id }, 'AI check complete')}><FiCpu /> Run AI check</Btn>}
+              {d.status !== 'approved' && <Btn size="sm" kind="ok" onClick={rpc('review_document', { p_doc: d.id, p_status: 'approved', p_note: null }, 'Document verified manually')}><FiCheck /> Verify manually</Btn>}
+              {d.status !== 'rejected' && <Btn size="sm" kind="danger" onClick={() => setModal({ title: 'Reject document', label: 'Why is this document rejected?', cta: 'Reject document', run: async (r) => { need(await db.rpc('review_document', { p_doc: d.id, p_status: 'rejected', p_note: r })); toast('Document rejected'); await refresh(); } })}><FiX /> Reject</Btn>}
+              {aiOpen[d.id] && <div className="doc-ai"><AIReview review={latestFor((r) => r.document_id === d.id)} />
+                <Btn size="sm" kind="ghost" disabled={!apiReady()} title={aiHint} onClick={runAI('/ai/review-document', { document_id: d.id }, 'AI check complete')}><FiRefreshCw /> Re-check with AI</Btn></div>}
             </div>
           )) : <div className="m">No documents uploaded.</div>}
         </div>
         {o.verification_note && <div className="m" style={{ marginTop: 8 }}>Note: {o.verification_note}</div>}
         <div className="acts">
-          {o.verification !== 'approved' && <><input className="noteinp" value={note} onChange={(e) => setNotes({ ...notesById, [o.id]: e.target.value })} placeholder="Note to the organisation (required to reject)" aria-label="Review note" />
+          {o.verification === 'rejected' && !reopen[o.id] && <><span className="m decided">Rejected. The organisation has been told why.</span>
+            <Btn size="sm" kind="ghost" onClick={() => setReopen({ ...reopen, [o.id]: true })}>Reconsider</Btn></>}
+          {(o.verification === 'pending' || (o.verification === 'rejected' && reopen[o.id])) && <><input className="noteinp" value={note} onChange={(e) => setNotes({ ...notesById, [o.id]: e.target.value })} placeholder="Note to the organisation (required to reject)" aria-label="Review note" />
             <Btn size="sm" kind="ok" onClick={async () => { need(await db.rpc('review_org', { p_org: o.id, p_approve: true, p_note: note.trim() || null })); toast('Organisation approved'); await refresh(); }}>Approve</Btn>
             <Btn size="sm" kind="danger" onClick={async () => { if (!note.trim()) throw new Error('Write a note explaining the rejection first.'); need(await db.rpc('review_org', { p_org: o.id, p_approve: false, p_note: note.trim() })); toast('Organisation rejected'); await refresh(); }}>Reject</Btn></>}
           {full && o.verification === 'approved' && !o.suspended && <Btn size="sm" kind="danger" onClick={() => setModal({ title: `Suspend ${o.name}`, label: 'Reason (shown to the organisation)', cta: 'Suspend account', run: async (r) => { need(await db.rpc('suspend_org', { p_org: o.id, p_suspend: true, p_reason: r })); toast('Account suspended. Open listings were withdrawn.'); await refresh(); } })}>Suspend</Btn>}

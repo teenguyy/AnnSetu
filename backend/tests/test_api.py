@@ -20,7 +20,7 @@ GOOD = {"document_type": "fssai_licence", "organisation_name": "Hotel Sunrise Pv
         "expiry_date": "2030-03-31", "legible": True, "red_flags": []}
 
 
-def make(gemini_json=None, gemini_text="Hello from AnnSetu.", gemini_status=200, ai=True):
+def make(gemini_json=None, gemini_text="Hello from AnnSetu.", gemini_status=200, ai=True, secret="s3cret", maps=""):
     calls = {"saved": None, "gemini": []}
 
     def handler(req: httpx.Request) -> httpx.Response:
@@ -58,13 +58,17 @@ def make(gemini_json=None, gemini_text="Hello from AnnSetu.", gemini_status=200,
             return httpx.Response(200, content=b"%PDF-1.4 test", headers={"content-type": "application/pdf"})
         if url.endswith("/rpc/admin_document_numbers"):
             return httpx.Response(200, json=[{"org_id": "other", "number": "99999999999999"}])
+        if url.endswith("/rpc/save_document_review_auto"):
+            calls["auto"] = json.loads(req.content)
+            return httpx.Response(200, json="55555555-5555-5555-5555-555555555555")
         if url.endswith("/rpc/save_document_review"):
             calls["saved"] = json.loads(req.content)
             return httpx.Response(200, json="33333333-3333-3333-3333-333333333333")
         return httpx.Response(404, json={"message": f"unexpected {url}"})
 
     s = Settings(supabase_url=SB, supabase_anon_key="anon", gemini_api_key="k" if ai else "",
-                 gemini_base_url="https://ai.test", allowed_origins="http://localhost:8080")
+                 gemini_base_url="https://ai.test", allowed_origins="http://localhost:8080",
+                 ai_review_secret=secret, google_maps_api_key=maps)
     app = create_app(s)
     client = TestClient(app)
     client.__enter__()
@@ -182,3 +186,41 @@ def test_red_flags_never_look_valid():
     checks = run_checks({**GOOD, "red_flags": ["not an official certificate"]}, ORG, [], today=date(2026, 11, 20))
     conf, rec = score(checks)
     assert rec == "needs_review" and conf < 80
+
+
+def test_auto_review_by_uploader_uses_secret_and_fast_model():
+    c, calls = make({**GOOD, "genuine_assessment": "likely_genuine", "genuine_reasons": ["FSSAI logo", "QR code"]})
+    r = c.post("/ai/auto-review", json={"document_id": DOC["id"]}, headers={"Authorization": f"Bearer {USER}"})
+    assert r.status_code == 200, r.text
+    sent = calls["auto"]
+    assert sent["p_secret"] == "s3cret" and sent["p_doc"] == DOC["id"] and sent["p_genuine"] == "likely_genuine"
+    assert calls["gemini"][0]["reasoning_effort"] == "low"
+    assert c.post("/ai/auto-review", json={"document_id": DOC["id"]}).status_code == 401
+
+
+def test_auto_review_disabled_without_secret():
+    c, _ = make(GOOD, secret="")
+    r = c.post("/ai/auto-review", json={"document_id": DOC["id"]}, headers={"Authorization": f"Bearer {USER}"})
+    assert r.status_code == 503
+
+
+def test_fake_document_is_flagged():
+    fake = {**GOOD, "genuine_assessment": "likely_fake", "genuine_reasons": ["no official seal", "placeholder number"]}
+    checks = run_checks(fake, ORG, [], today=date(2026, 11, 20))
+    res = {c["check"]: c["result"] for c in checks}
+    assert res["Looks genuine"] == "fail" and score(checks)[1] != "looks_valid"
+
+
+def test_registry_formats():
+    from app.verify import registry_check
+    assert registry_check("fssai_licence", "12345678901234")["result"] == "pass"
+    assert registry_check("fssai_licence", "99999999999999")["result"] == "fail"
+    assert registry_check("ngo_darpan", "MH/2017/0123456")["result"] == "pass"
+    assert "foscos.fssai.gov.in" in registry_check("fssai_licence", "12345678901234")["detail"]
+
+
+def test_config_and_chat_is_fast():
+    c, calls = make(maps="maps-key")
+    assert c.get("/config").json() == {"maps_key": "maps-key", "ai": True}
+    c.post("/chat", json={"messages": [{"role": "user", "content": "hi"}]})
+    assert calls["gemini"][0]["reasoning_effort"] == "none"

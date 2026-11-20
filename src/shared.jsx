@@ -4,6 +4,8 @@ import { db, DONOR_TYPES, NGO_TYPES, DOC_TYPES, uploadTo, ago, fmtD, fmtDT } fro
 import { need, saveOrg, orgDocs, loadMessages, sendMessage, fileReport, loadImpact } from './data.js';
 import { Btn, AsyncForm, Field, Card, Tag, Empty, Modal, Ring, Bar, Stat, useToast, useLoader, Skeleton } from './ui.jsx';
 import { PageHead } from './shell.jsx';
+import { api, apiReady } from './api.js';
+import { addressFor } from './maps.js';
 
 export const canAct = (org) => !!org && org.verification === 'approved' && !org.suspended;
 
@@ -188,7 +190,16 @@ export function ProfileView({ role, user, org, docs, onChanged, extra }) {
   const useMyLocation = () => new Promise((res) => {
     if (!navigator.geolocation) { toast('Your browser can’t share location.', 'bad'); return res(); }
     navigator.geolocation.getCurrentPosition(
-      (p) => { setPos({ lat: p.coords.latitude.toFixed(6), lng: p.coords.longitude.toFixed(6) }); toast('Location captured. Save to keep it.', 'info'); res(); },
+      (p) => {
+        const lat = p.coords.latitude, lng = p.coords.longitude;
+        setPos({ lat: lat.toFixed(6), lng: lng.toFixed(6) });
+        // Google Maps fills in the address too (if the Maps key is configured and the field is empty)
+        addressFor(lat, lng).then((addr) => {
+          const el = document.querySelector('input[name=address]');
+          if (addr && el && !el.value.trim()) { el.value = addr.slice(0, 160); toast('Location and address filled from Google Maps. Save to keep them.', 'info'); }
+        }).catch(() => {});
+        toast('Location captured. Save to keep it.', 'info'); res();
+      },
       () => { toast('Couldn’t read your location. Allow location access and try again.', 'bad'); res(); },
       { enableHighAccuracy: true, timeout: 12000 });
   });
@@ -216,9 +227,11 @@ export function ProfileView({ role, user, org, docs, onChanged, extra }) {
     if (f.size > 5 * 1024 * 1024) throw new Error('File must be 5 MB or smaller.');
     if (!/^(application\/pdf|image\/(jpeg|png))$/.test(f.type)) throw new Error('Upload a PDF, JPG or PNG.');
     const path = await uploadTo('verification-docs', user.id, f, org.id + '/');
-    need(await db.from('verification_documents').insert({ org_id: org.id, path, doc_type: fd.get('doc_type') }));
+    const row = need(await db.from('verification_documents').insert({ org_id: org.id, path, doc_type: fd.get('doc_type') }).select('id').single());
     form.reset();
-    toast('Document uploaded. An admin will review it.');
+    // AI reads and checks the document straight away, so the admin's summary is ready before they open it.
+    if (row && row.id && apiReady()) api('/ai/auto-review', { document_id: row.id }).catch(() => {});
+    toast('Document uploaded. Our AI is checking it now; an admin will make the final decision.');
     await onChanged();
   };
   const delDoc = async (d) => { need(await db.from('verification_documents').delete().eq('id', d.id)); toast('Document removed.'); await onChanged(); };

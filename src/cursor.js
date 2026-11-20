@@ -45,27 +45,19 @@ function mount(reduce) {
       <g class="cx-nodes"><circle cx="-13" cy="-13" r="2.4"/><circle cx="13" cy="-13" r="2.4"/><circle cx="13" cy="13" r="2.4"/><circle cx="-13" cy="13" r="2.4"/></g>
       <g class="cx-dir"><path d="M-6 -7 L4 0 L-6 7"/></g>
     </svg>`;
-  const trail = document.createElement('canvas');
-  trail.className = 'cx-trail';
-  trail.setAttribute('aria-hidden', 'true');
-  document.body.append(trail, el);
+  document.body.append(el);
   root.classList.add('has-cx');
   const dot = el.querySelector('.cx-dot');
   const hair = el.querySelector('.cx-hair');
   const dirG = el.querySelector('.cx-dir');
-  const ctx = trail.getContext('2d');
-  let dpr = Math.min(2, window.devicePixelRatio || 1);
-  const size = () => { dpr = Math.min(2, window.devicePixelRatio || 1); trail.width = innerWidth * dpr; trail.height = innerHeight * dpr; };
-  size();
 
   let x = -100, y = -100, hx = x, hy = y, vx = 0, vy = 0, angle = 0;
   let raf = 0, visible = false, mode = '';
   let magnet = null; // element the ring gently pulls towards
-  const pts = [];
 
   const tick = () => {
     const still = reduce.matches;
-    const k = still ? 1 : 0.24;
+    const k = still ? 1 : 0.55; // snappy: follows the pointer within ~2 frames
     let tx = x, ty = y;
     if (magnet && !still) {
       const r = magnet.getBoundingClientRect();
@@ -78,24 +70,9 @@ function mount(reduce) {
     if (sp > 0.6) angle = Math.atan2(vy, vx) * 57.2958;
     dirG.style.transform = `rotate(${angle}deg) translateX(20px)`;
     vx *= 0.82; vy *= 0.82;
-    // fading connection trail
-    ctx.clearRect(0, 0, trail.width, trail.height);
-    if (!still && visible) {
-      pts.push([hx, hy]);
-      if (pts.length > 16) pts.shift();
-      for (let i = 1; i < pts.length; i++) {
-        const a = i / pts.length;
-        ctx.strokeStyle = `rgba(130,197,223,${(a * 0.55).toFixed(3)})`;
-        ctx.lineWidth = a * 1.6 * dpr;
-        ctx.beginPath();
-        ctx.moveTo(pts[i - 1][0] * dpr, pts[i - 1][1] * dpr);
-        ctx.lineTo(pts[i][0] * dpr, pts[i][1] * dpr);
-        ctx.stroke();
-      }
-    } else pts.length = 0;
+    // (the full-screen trail canvas was removed: repainting it every frame made the cursor lag on the landing page)
     const settled = Math.abs(tx - hx) < 0.1 && Math.abs(ty - hy) < 0.1 && sp < 0.05;
-    if (settled && pts.length) pts.shift();
-    raf = settled && !pts.length ? 0 : requestAnimationFrame(tick);
+    raf = settled ? 0 : requestAnimationFrame(tick);
   };
   const kick = () => { if (!raf) raf = requestAnimationFrame(tick); };
 
@@ -132,7 +109,6 @@ function mount(reduce) {
   addEventListener('pointerup', onUp, { passive: true });
   document.addEventListener('pointerover', onOver, { passive: true });
   document.addEventListener('mouseout', onLeave);
-  addEventListener('resize', size);
   addEventListener('annsetu:cursor', onMode);
 
   return () => {
@@ -142,9 +118,8 @@ function mount(reduce) {
     removeEventListener('pointerup', onUp);
     document.removeEventListener('pointerover', onOver);
     document.removeEventListener('mouseout', onLeave);
-    removeEventListener('resize', size);
     removeEventListener('annsetu:cursor', onMode);
-    el.remove(); trail.remove();
+    el.remove();
     root.classList.remove('has-cx');
   };
 }

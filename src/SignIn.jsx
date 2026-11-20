@@ -3,7 +3,7 @@ import { FiEye, FiEyeOff, FiArrowLeft, FiCheck } from 'react-icons/fi';
 import { db, ROUTES, SIGNIN, EMAIL_RE, errMsg } from './lib.js';
 import { loadMe, need } from './data.js';
 import { ThemeToggle } from './shell.jsx';
-import { Logo, Monogram } from './brand.jsx';
+import { Logo } from './brand.jsx';
 import { Btn, AsyncForm, Field, useToast } from './ui.jsx';
 
 const COPY = {
@@ -75,8 +75,7 @@ function Art({ view, role }) {
   const [title, text] = COPY[kind];
   return (
     <section className={'art art-' + kind} aria-label="About AnnSetu" data-dark>
-      <Logo tone="reverse" size={44} tagline />
-      <div className="art-mark" aria-hidden="true"><Monogram size={kind === 'signin' ? 120 : 84} tone="reverse" draw key={kind} /></div>
+      <Logo tone="reverse" size={64} tagline />
       <div className="cap" aria-live="polite"><div className="on" key={kind}><h2>{title}</h2><p>{text}</p></div></div>
       <Scene kind={kind} />
       <p className="art-note">verified · code-confirmed · real impact</p>

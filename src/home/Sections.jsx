@@ -94,12 +94,16 @@ export function Journey() {
   // Auto-play: when the section comes into view the route draws itself, the hot-food marker travels it,
   // and the stops light up one by one, then it rests and loops. No scroll-pinning or scrubbing.
   useGsap(ref, (reduced) => {
+    // Use the real length in px (pathLength scaling is ignored by some browsers, which made the line look finished early).
+    const drawEl = ref.current && ref.current.querySelector('#jr-draw');
+    const L = drawEl ? drawEl.getTotalLength() : 1000;
+    gsap.set('#jr-draw', { strokeDasharray: `${L} ${L + 20}`, strokeDashoffset: L });
     if (reduced) { setActive(STEPS.length - 1); gsap.set('#jr-draw', { strokeDashoffset: 0 }); return undefined; }
     const n = STEPS.length - 1;
     const tl = gsap.timeline({ paused: true, repeat: -1, repeatDelay: 2.2,
       onRepeat: () => setActive(0),
       onUpdate: () => { const pr = Math.min(1, tl.time() / 7); setActive(Math.min(n, Math.floor(pr * n + 0.02))); } });
-    tl.set('#jr-draw', { strokeDashoffset: 1 }, 0)
+    tl.set('#jr-draw', { strokeDashoffset: L }, 0)
       .to('#jr-draw', { strokeDashoffset: 0, duration: 7, ease: 'none' }, 0)
       .fromTo('.jr-marker', { motionPath: { path: '#jr-path', align: '#jr-path', alignOrigin: [0.5, 0.5], autoRotate: false, end: 0 } },
         { motionPath: { path: '#jr-path', align: '#jr-path', alignOrigin: [0.5, 0.5], autoRotate: false, end: 1 }, duration: 7, ease: 'none' }, 0)
@@ -132,7 +136,7 @@ export function Journey() {
           <div className="jr-stage">
             <svg className="jr-svg" viewBox="0 0 1200 340" aria-hidden="true">
               <path id="jr-path" d={ROUTE} className="jr-base" />
-              <path id="jr-draw" d={ROUTE} className="jr-line" pathLength="1" />
+              <path id="jr-draw" d={ROUTE} className="jr-line" />
               {pts.map(([x, y], i) => (
                 <g key={i} className={'jr-node' + (i <= active ? ' on' : '') + (i === active ? ' now' : '')} transform={`translate(${x} ${y})`}>
                   <circle r="22" className="halo" /><circle r="9" className="core" />
