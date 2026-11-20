@@ -16,9 +16,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('en_IN');
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(statusBarColor: Colors.transparent));
-  await Future.wait([ThemeController.instance.load(), Onboarding.load()]);
+  // Nothing optional may stop the app from opening: each step falls back safely if it fails.
+  await _safe('settings', () => Future.wait([ThemeController.instance.load(), Onboarding.load()]));
   await initSupabase();
-  await NotificationService.instance.init();
+  await _safe('notifications', NotificationService.instance.init);
   NotificationService.instance.onOpenRoute = (r) => appRouter.go(r);
   unawaited(AppSession.instance.start());
   AppSession.instance.addListener(() {
@@ -29,6 +30,14 @@ Future<void> main() async {
   // test can find widgets by their labels. Never set in release builds.
   if (const bool.fromEnvironment('E2E')) SemanticsBinding.instance.ensureSemantics();
   runApp(const AnnSetuApp());
+}
+
+Future<void> _safe(String what, Future<Object?> Function() step) async {
+  try {
+    await step();
+  } catch (e, st) {
+    debugPrint('Startup step "$what" failed, continuing: $e\n$st');
+  }
 }
 
 /// `annsetu://open/PATH` opens a screen, e.g. annsetu://open/notifications or annsetu://open/home?tab=2.

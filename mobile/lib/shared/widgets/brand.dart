@@ -44,21 +44,20 @@ class BridgePainter extends CustomPainter {
   bool shouldRepaint(BridgePainter o) => o.progress != progress || o.dot != dot || o.arch != arch;
 }
 
+/// The AnnSetu "A-bridge" mark (same artwork as the website, rendered from its SVG).
 class BrandMark extends StatelessWidget {
   final double size;
   final bool onDark;
   const BrandMark({super.key, this.size = 44, this.onDark = false});
   @override
-  Widget build(BuildContext context) => Container(
-        width: size, height: size,
-        decoration: BoxDecoration(color: Brand.forest, borderRadius: BorderRadius.circular(size * .28),
-            border: onDark ? Border.all(color: Brand.gold.withValues(alpha: .35)) : null),
-        padding: EdgeInsets.all(size * .14),
-        child: CustomPaint(painter: BridgePainter(dot: .5)),
-      );
+  Widget build(BuildContext context) {
+    final dark = onDark || Theme.of(context).brightness == Brightness.dark;
+    return Image.asset(dark ? 'assets/brand/mark_reverse.png' : 'assets/brand/mark.png',
+        width: size, height: size, filterQuality: FilterQuality.high, semanticLabel: 'AnnSetu');
+  }
 }
 
-/// "AnnSetu" wordmark (website: Ann<span>Setu</span>, with Setu in gold).
+/// "AnnSetu" wordmark like the website: italic "Ann" + bold "Setu" (Setu in sunshine on dark backgrounds).
 class Wordmark extends StatelessWidget {
   final double size;
   final bool onDark;
@@ -67,8 +66,8 @@ class Wordmark extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = onDark || Theme.of(context).brightness == Brightness.dark;
     return Text.rich(TextSpan(children: [
-      TextSpan(text: 'Ann', style: TextStyle(color: dark ? Brand.cream : Brand.forest)),
-      TextSpan(text: 'Setu', style: TextStyle(color: dark ? Brand.gold : Brand.goldDeep)),
+      TextSpan(text: 'Ann', style: TextStyle(fontStyle: FontStyle.italic, fontWeight: FontWeight.w500, color: dark ? Brand.cream : Brand.dark)),
+      TextSpan(text: 'Setu', style: TextStyle(fontWeight: FontWeight.w700, color: dark ? Brand.gold : Brand.forest)),
     ]), style: TextStyle(fontFamily: serif, fontSize: size, height: 1));
   }
 }
@@ -76,13 +75,22 @@ class Wordmark extends StatelessWidget {
 class Logo extends StatelessWidget {
   final double size;
   final bool onDark;
-  const Logo({super.key, this.size = 36, this.onDark = false});
+  final bool tagline;
+  const Logo({super.key, this.size = 36, this.onDark = false, this.tagline = false});
   @override
-  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-        BrandMark(size: size, onDark: onDark),
-        SizedBox(width: size * .3),
+  Widget build(BuildContext context) {
+    final dark = onDark || Theme.of(context).brightness == Brightness.dark;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      BrandMark(size: size, onDark: onDark),
+      SizedBox(width: size * .25),
+      Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Wordmark(size: size * .72, onDark: onDark),
-      ]);
+        if (tagline) Padding(padding: EdgeInsets.only(top: size * .08),
+            child: Text('CONNECT · SHARE · NOURISH', style: TextStyle(fontFamily: grot, fontSize: size * .2, fontWeight: FontWeight.w700,
+                letterSpacing: size * .05, color: dark ? Brand.sky : Brand.sage))),
+      ]),
+    ]);
+  }
 }
 
 /// Custom loading animation: the bridge draws itself, then a grain crosses it.
@@ -95,7 +103,7 @@ class BridgeLoader extends StatefulWidget {
 }
 
 class _BridgeLoaderState extends State<BridgeLoader> with SingleTickerProviderStateMixin {
-  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat();
+  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat();
   @override
   void dispose() {
     _c.dispose();
@@ -106,21 +114,20 @@ class _BridgeLoaderState extends State<BridgeLoader> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     final reduce = MediaQuery.of(context).disableAnimations;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final archColor = dark ? Brand.cream : Brand.forest;
     return Semantics(
       label: widget.label ?? 'Loading',
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         SizedBox(
-          width: widget.size, height: widget.size * .7,
+          width: widget.size, height: widget.size,
           child: AnimatedBuilder(
             animation: _c,
-            builder: (_, _) {
-              final t = reduce ? 1.0 : _c.value;
-              final draw = (t / .45).clamp(0.0, 1.0);
-              final dot = ((t - .45) / .55).clamp(0.0, 1.0);
-              return CustomPaint(painter: BridgePainter(progress: Curves.easeOutCubic.transform(draw),
-                  dot: .5 - .5 * math.cos(dot * math.pi), arch: archColor, deck: archColor));
-            },
+            builder: (_, child) => Stack(alignment: Alignment.center, children: [
+              SizedBox(width: widget.size, height: widget.size,
+                  child: CircularProgressIndicator(strokeWidth: 2.5, value: reduce ? 1 : null, color: dark ? Brand.gold : Brand.sage,
+                      backgroundColor: (dark ? Brand.gold : Brand.sage).withValues(alpha: .15))),
+              Transform.scale(scale: reduce ? 1 : 1 + .05 * math.sin(_c.value * 2 * math.pi), child: child),
+            ]),
+            child: BrandMark(size: widget.size * .62),
           ),
         ),
         if (widget.label != null) ...[const SizedBox(height: 12), Text(widget.label!, style: Theme.of(context).textTheme.bodySmall)],

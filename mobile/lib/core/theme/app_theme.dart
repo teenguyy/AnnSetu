@@ -23,8 +23,9 @@ class Brand {
   static const terraDeep = Color(0xFFB5523F);
 }
 
-const serif = 'DMSerifDisplay';
-const sans = 'DMSans';
+const serif = 'Fraunces';        // website headings
+const sans = 'DMSans';           // website body
+const grot = 'SpaceGrotesk';     // website labels, buttons, navigation
 
 class AppTheme {
   static ThemeData light() => _build(Brightness.light);
@@ -41,26 +42,26 @@ class AppTheme {
       brightness: b,
       primary: isDark ? Brand.gold : Brand.forest,
       onPrimary: isDark ? Brand.dark : Brand.cream,
-      primaryContainer: isDark ? const Color(0xFF1E4A40) : const Color(0xFFDCE5DD),
+      primaryContainer: isDark ? const Color(0xFF1E3D52) : const Color(0xFFCFE6F1),
       onPrimaryContainer: isDark ? Brand.cream : Brand.forest,
       secondary: Brand.gold,
       onSecondary: Brand.dark,
-      secondaryContainer: isDark ? const Color(0xFF3A3020) : const Color(0xFFF1E5C8),
+      secondaryContainer: isDark ? const Color(0xFF3A3420) : const Color(0xFFFFF1C4),
       onSecondaryContainer: isDark ? Brand.cream : Brand.goldDeep,
       tertiary: Brand.terracotta,
       onTertiary: Colors.white,
       error: isDark ? const Color(0xFFE59A80) : Brand.terraDeep,
       onError: Colors.white,
-      errorContainer: isDark ? const Color(0xFF4A2A20) : const Color(0xFFF4DED5),
+      errorContainer: isDark ? const Color(0xFF4A2826) : const Color(0xFFF6D3CC),
       onErrorContainer: isDark ? const Color(0xFFF6CDBF) : Brand.terraDeep,
       surface: surface,
       onSurface: onSurface,
       onSurfaceVariant: muted,
       surfaceContainerLowest: bg,
-      surfaceContainerLow: isDark ? const Color(0xFF0F231C) : const Color(0xFFF0EADA),
-      surfaceContainer: isDark ? Brand.nightSurface : Brand.parchment,
-      surfaceContainerHigh: isDark ? const Color(0xFF173129) : const Color(0xFFE4DAC0),
-      surfaceContainerHighest: isDark ? const Color(0xFF1C3A30) : const Color(0xFFDDD2B5),
+      surfaceContainerLow: isDark ? const Color(0xFF13212C) : const Color(0xFFE2F0F6),
+      surfaceContainer: isDark ? Brand.nightSurface : const Color(0xFFDDEEF5),
+      surfaceContainerHigh: isDark ? const Color(0xFF1E3344) : const Color(0xFFD2E8F1),
+      surfaceContainerHighest: isDark ? const Color(0xFF24394A) : const Color(0xFFC8E1EC),
       outline: line,
       outlineVariant: line.withValues(alpha: .6),
       shadow: Colors.black,
@@ -80,17 +81,17 @@ class AppTheme {
       headlineLarge: s(t.headlineLarge, family: serif, size: 30, height: 1.12),
       headlineMedium: s(t.headlineMedium, family: serif, size: 26, height: 1.15),
       headlineSmall: s(t.headlineSmall, family: serif, size: 22, height: 1.2),
-      titleLarge: s(t.titleLarge, family: serif, size: 20, height: 1.25),
+      titleLarge: s(t.titleLarge, family: serif, size: 21, w: FontWeight.w600, height: 1.2),
       titleMedium: s(t.titleMedium, size: 16, w: FontWeight.w600),
       titleSmall: s(t.titleSmall, size: 14, w: FontWeight.w600),
       bodyLarge: s(t.bodyLarge, size: 16, height: 1.5),
       bodyMedium: s(t.bodyMedium, size: 14.5, height: 1.5),
       bodySmall: s(t.bodySmall, size: 12.5, height: 1.4).copyWith(color: muted),
-      labelLarge: s(t.labelLarge, size: 14, w: FontWeight.w600, ls: .2),
-      labelMedium: s(t.labelMedium, size: 12, w: FontWeight.w600, ls: .6),
-      labelSmall: s(t.labelSmall, size: 11, w: FontWeight.w600, ls: 1.2).copyWith(color: muted),
+      labelLarge: s(t.labelLarge, family: grot, size: 15, w: FontWeight.w700, ls: .1),
+      labelMedium: s(t.labelMedium, family: grot, size: 12.5, w: FontWeight.w600, ls: .4),
+      labelSmall: s(t.labelSmall, family: grot, size: 11, w: FontWeight.w700, ls: 1.4).copyWith(color: muted),
     );
-    final radius = BorderRadius.circular(14);
+    final radius = BorderRadius.circular(22); // website cards: soft, rounded
     return base.copyWith(
       scaffoldBackgroundColor: bg,
       textTheme: text,
@@ -105,21 +106,22 @@ class AppTheme {
       ),
       dividerTheme: DividerThemeData(color: line.withValues(alpha: .7), thickness: 1, space: 1),
       inputDecorationTheme: InputDecorationTheme(
-        filled: true, fillColor: isDark ? const Color(0xFF0F231C) : Colors.white.withValues(alpha: .6),
+        filled: true, fillColor: isDark ? const Color(0xFF13212C) : const Color(0xFFF2F9FC),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: line)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: line)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: scheme.primary, width: 1.6)),
-        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: scheme.error)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: line)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: line)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: isDark ? const Color(0xFF8CC8DE) : Brand.sage, width: 2)),
+        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: scheme.error)),
         labelStyle: TextStyle(color: muted), floatingLabelStyle: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600),
       ),
       filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(
-        minimumSize: const Size(64, 52), padding: const EdgeInsets.symmetric(horizontal: 22),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), textStyle: text.labelLarge,
+        minimumSize: const Size(64, 54), padding: const EdgeInsets.symmetric(horizontal: 24),
+        backgroundColor: isDark ? Brand.gold : Brand.dark, foregroundColor: isDark ? Brand.dark : Brand.gold,
+        shape: const StadiumBorder(), textStyle: text.labelLarge, // bold pill buttons, like the website
       )),
       outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(
         minimumSize: const Size(64, 50), padding: const EdgeInsets.symmetric(horizontal: 20), foregroundColor: onSurface,
-        side: BorderSide(color: line, width: 1.4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        side: BorderSide(color: isDark ? line : Brand.dark, width: 1.6), shape: const StadiumBorder(),
         textStyle: text.labelLarge,
       )),
       textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: isDark ? Brand.gold : Brand.forest, textStyle: text.labelLarge)),
@@ -129,11 +131,11 @@ class AppTheme {
         checkmarkColor: isDark ? Brand.dark : Brand.cream, shape: const StadiumBorder(),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: isDark ? Brand.nightSurface : Brand.forest, height: 70, elevation: 0,
-        indicatorColor: isDark ? Brand.gold.withValues(alpha: .22) : Brand.gold.withValues(alpha: .28),
-        indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        iconTheme: WidgetStateProperty.resolveWith((st) => IconThemeData(color: st.contains(WidgetState.selected) ? Brand.gold : Brand.cream.withValues(alpha: .72), size: 24)),
-        labelTextStyle: WidgetStateProperty.resolveWith((st) => TextStyle(fontFamily: sans, fontSize: 11.5,
+        backgroundColor: Brand.dark, height: 72, elevation: 0, // website sidebar: deep ink with a sunshine pill
+        indicatorColor: Brand.gold,
+        indicatorShape: const StadiumBorder(),
+        iconTheme: WidgetStateProperty.resolveWith((st) => IconThemeData(color: st.contains(WidgetState.selected) ? Brand.dark : Brand.cream.withValues(alpha: .72), size: 24)),
+        labelTextStyle: WidgetStateProperty.resolveWith((st) => TextStyle(fontFamily: grot, fontSize: 11.5,
             fontWeight: st.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
             color: st.contains(WidgetState.selected) ? Brand.cream : Brand.cream.withValues(alpha: .72))),
       ),
@@ -145,13 +147,13 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating, backgroundColor: isDark ? Brand.cream : Brand.dark,
         contentTextStyle: TextStyle(fontFamily: sans, color: isDark ? Brand.dark : Brand.cream, fontSize: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       bottomSheetTheme: BottomSheetThemeData(backgroundColor: bg, showDragHandle: true,
           shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24)))),
-      dialogTheme: DialogThemeData(backgroundColor: bg, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+      dialogTheme: DialogThemeData(backgroundColor: surface, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26))),
       listTileTheme: ListTileThemeData(iconColor: muted, contentPadding: const EdgeInsets.symmetric(horizontal: 16)),
-      progressIndicatorTheme: ProgressIndicatorThemeData(color: isDark ? Brand.gold : Brand.forest, linearTrackColor: line.withValues(alpha: .5)),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: isDark ? Brand.gold : Brand.sage, linearTrackColor: line.withValues(alpha: .5)),
       pageTransitionsTheme: const PageTransitionsTheme(builders: {
         TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
       }),
@@ -167,13 +169,13 @@ class StatusTone {
     final dark = Theme.of(c).brightness == Brightness.dark;
     switch (s) {
       case 'approved': case 'accepted': case 'completed': case 'active': case 'open': case 'resolved': case 'fulfilled': case 'replied':
-        return dark ? const StatusTone(Color(0xFF1E4A40), Color(0xFFBFD8C9)) : const StatusTone(Color(0xFFDCE5DD), Brand.forest);
+        return dark ? const StatusTone(Color(0x298CC8DE), Color(0xFFA9D3E3)) : const StatusTone(Color(0xFFA8D9E9), Color(0xFF0E3553));
       case 'pending': case 'reviewing': case 'in_review': case 'new': case 'reserved':
-        return dark ? const StatusTone(Color(0xFF3A3020), Color(0xFFE7CC8F)) : const StatusTone(Color(0xFFF1E5C8), Brand.goldDeep);
+        return dark ? const StatusTone(Color(0x24F2D88C), Color(0xFFEBD493)) : const StatusTone(Color(0xFFF5D98B), Color(0xFF4A3A0C));
       case 'rejected': case 'cancelled': case 'withdrawn': case 'suspended': case 'dismissed':
-        return dark ? const StatusTone(Color(0xFF4A2A20), Color(0xFFF2B9A5)) : const StatusTone(Color(0xFFF4DED5), Brand.terraDeep);
+        return dark ? const StatusTone(Color(0x29E8907F), Color(0xFFEBA898)) : const StatusTone(Color(0xFFF6D3CC), Color(0xFF8E2F20));
       default:
-        return dark ? const StatusTone(Color(0xFF1C3A30), Color(0xFFA9B8AE)) : const StatusTone(Color(0xFFE4DAC0), Color(0xFF4B5F55));
+        return dark ? const StatusTone(Color(0xFF24394A), Color(0xFF93AAB8)) : const StatusTone(Color(0xFFD2E8F1), Color(0xFF3A5C74));
     }
   }
 }

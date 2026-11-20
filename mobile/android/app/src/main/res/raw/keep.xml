@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Resources used only by name from Dart (e.g. the notification icon) are invisible to the
+     resource shrinker. Without this file the release build deleted ic_stat_annsetu and the app
+     failed at startup when notifications were initialised. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_annsetu,@mipmap/ic_launcher,@mipmap/ic_launcher_round,@mipmap/launcher_icon" />
