@@ -72,7 +72,7 @@ class NotificationService with WidgetsBindingObserver {
       }
       final fm = FirebaseMessaging.instance;
       await fm.requestPermission();
-      // FCM registration tokens are what the `push` Edge Function sends to (FCM HTTP v1 `message.token`).
+      // The database sends a push to these tokens (via the AnnSetu API, FCM HTTP v1) for every new notification.
       // ignore: deprecated_member_use
       final token = await fm.getToken();
       if (token != null) await db.rpc('register_device_token', params: {'p_token': token, 'p_platform': 'android'});

@@ -224,3 +224,51 @@ def test_config_and_chat_is_fast():
     assert c.get("/config").json() == {"maps_key": "maps-key", "ai": True}
     c.post("/chat", json={"messages": [{"role": "user", "content": "hi"}]})
     assert calls["gemini"][0]["reasoning_effort"] == "none"
+
+
+def test_push_requires_database_secret_and_sends(monkeypatch):
+    import hashlib
+
+    from app import push
+    c, _ = make()
+    c.app.state.settings  # noqa: B018
+    s = c.app.state.settings
+    s.push_secret_sha256 = hashlib.sha256(b"db-secret").hexdigest()
+    s.fcm_service_account = '{"project_id": "p1"}'
+    sent = []
+
+    async def fake_token(_):
+        return "tok", "p1"
+
+    async def fake_send(client, sa, tokens, title, body, link=None, token_fn=None):
+        sent.append((tokens, title))
+        return {"sent": len(tokens), "failed": []}
+
+    monkeypatch.setattr(push, "send", fake_send)
+    payload = {"tokens": ["a" * 30], "title": "Pickup update", "body": "Ravi is on the way"}
+    assert c.post("/push/send", json=payload).status_code == 403
+    assert c.post("/push/send", json=payload, headers={"x-push-secret": "wrong"}).status_code == 403
+    r = c.post("/push/send", json=payload, headers={"x-push-secret": "db-secret"})
+    assert r.status_code == 200 and r.json()["sent"] == 1 and sent[0][1] == "Pickup update"
+
+
+def test_fcm_message_shape():
+    import asyncio
+
+    import httpx as hx
+
+    from app import push
+    seen = []
+    def h(req):
+        seen.append((str(req.url), json.loads(req.content)))
+        return hx.Response(200, json={"name": "ok"})
+    async def tok(_):
+        return "bearer", "annsetu-app1"
+    async def run():
+        async with hx.AsyncClient(transport=hx.MockTransport(h)) as cl:
+            return await push.send(cl, "{}", ["t" * 30], "Title", "Body", "rep.html", token_fn=tok)
+    out = asyncio.run(run())
+    assert out["sent"] == 1
+    url, msg = seen[0]
+    assert url.endswith("/projects/annsetu-app1/messages:send")
+    assert msg["message"]["android"]["notification"]["channel_id"] == "annsetu_updates"

@@ -21,9 +21,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from . import push
 from .chatbot import system_prompt
 from .config import Settings, get_settings
 from .gemini import AIUnavailable, Gemini, parse_json
+from .push import secret_ok
 from .supa import Supa, SupabaseError
 from .verify import EXTRACT_PROMPT, NO_CERT_PROMPT, run_checks, score, summarise
 
@@ -164,6 +166,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "p_model": settings.gemini_model,
         })
         return {"id": review_id, "recommendation": rec}
+
+    class PushIn(BaseModel):
+        tokens: list[str] = Field(min_length=1, max_length=20)
+        title: str = Field(min_length=1, max_length=200)
+        body: str | None = Field(default=None, max_length=1000)
+        link: str | None = Field(default=None, max_length=300)
+
+    @app.post("/push/send")
+    async def push_send(body: PushIn, request: Request, x_push_secret: str | None = Header(default=None)):
+        """Called only by the database (pg_net) when a notification is created."""
+        if not secret_ok(x_push_secret, settings.push_secret_sha256):
+            raise HTTPException(403, "Not allowed.")
+        if not settings.fcm_service_account:
+            raise HTTPException(503, "Push is not configured.")
+        return await push.send(http(request), settings.fcm_service_account, body.tokens, body.title, body.body, body.link)
 
     @app.get("/config")
     async def public_config():

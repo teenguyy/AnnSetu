@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     ai_review_secret: str = ""
     # browser key for Google Maps JavaScript API (restrict it to your domains in Google Cloud)
     google_maps_api_key: str = ""
+    # Firebase service-account JSON (secret) and SHA-256 of the database push secret
+    fcm_service_account: str = ""
+    push_secret_sha256: str = ""
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
     allowed_origins: str = "https://annsetu-inky.vercel.app,http://localhost:8080,http://localhost:8000"
     max_document_bytes: int = 5 * 1024 * 1024

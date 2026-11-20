@@ -21,11 +21,11 @@ class Env {
   /// Must be listed in Supabase → Authentication → URL Configuration → Redirect URLs.
   static const authRedirect = 'annsetu://login-callback';
 
-  /// Optional Firebase Cloud Messaging (push). Push is enabled only when all four are provided.
-  static const fbApiKey = String.fromEnvironment('FIREBASE_API_KEY');
-  static const fbAppId = String.fromEnvironment('FIREBASE_APP_ID');
-  static const fbSenderId = String.fromEnvironment('FIREBASE_SENDER_ID');
-  static const fbProjectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
+  /// Firebase Cloud Messaging (push), project annsetu-app1 (values from google-services.json; app identifiers, not secrets).
+  static const fbApiKey = String.fromEnvironment('FIREBASE_API_KEY', defaultValue: 'AIzaSyABsIoFa2ESptcJrqNUxyQr6Xw9QHJ8Zks');
+  static const fbAppId = String.fromEnvironment('FIREBASE_APP_ID', defaultValue: '1:957995427645:android:635a1d4a9d3c28480a4754');
+  static const fbSenderId = String.fromEnvironment('FIREBASE_SENDER_ID', defaultValue: '957995427645');
+  static const fbProjectId = String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: 'annsetu-app1');
   static bool get pushConfigured => fbApiKey.isNotEmpty && fbAppId.isNotEmpty && fbSenderId.isNotEmpty && fbProjectId.isNotEmpty;
 
   static const supportEmail = String.fromEnvironment('SUPPORT_EMAIL', defaultValue: '');
