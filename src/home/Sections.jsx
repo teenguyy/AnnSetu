@@ -211,7 +211,7 @@ export function HomeDiscover({ session }) {
             intro={!state.reps.length ? <p className="board-warn">Add a pickup representative in your dashboard before sending requests. <a href="receiver.html#profile">Add one →</a></p> : null} />
           : <LockedBoard title="Your organisation isn’t verified yet" text="Once an admin approves your documents, live listings and the request tray open up here and in your dashboard."
             action={<a className="btn ink has-arrow" href="receiver.html#profile"><span>Open my profile</span><Arrow /></a>} />)}
-        {S === 'preview' && <DiscoverBoard listings={state.listings} ok={false} lockReason="Sign in as a verified receiver to request food." />}
+        {S === 'preview' && <DiscoverBoard listings={state.listings} ok={false} lockReason="Sign in as a verified receiver to request food." lockHref="signin.html?view=register&role=ngo" />}
         {S === 'role' && <LockedBoard title={state.role === 'admin' ? 'You’re signed in as an admin' : 'You’re signed in as a donor'}
           text={state.role === 'admin' ? 'Every listing is available in the admin console.' : 'Food discovery is for verified receivers. Manage your own listings and incoming requests from your dashboard.'}
           action={<a className="btn ink has-arrow" href={ROUTES[state.role]}><span>Go to my dashboard</span><Arrow /></a>} />}

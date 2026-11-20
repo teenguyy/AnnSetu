@@ -85,6 +85,7 @@
     },
     admin_set_setting(a) { if (prof().role !== 'admin') return err('Admins only'); db.app_settings = db.app_settings.filter((x) => x.key !== a.p_key); db.app_settings.push({ key: a.p_key, value: a.p_value }); return { data: null, error: null }; },
     admin_warn_org(a) { if (prof().role !== 'admin') return err('Admins only'); const r = db.reports.find((x) => x.id === a.p_report); if (r.status === 'open') r.status = 'reviewing'; notify(r.reported_org, 'Warning from AnnSetu admin', a.p_message); db.audit_log.push({ id: uuid(), admin_id: uid(), action: 'report_warning', details: { message: a.p_message }, created_at: now() }); return { data: null, error: null }; },
+    public_listings_preview() { return { data: db.food_listings.filter((l) => l.status === 'active' && new Date(l.pickup_by) > new Date() && l.qty_reserved < l.quantity).map((l) => ({ ...l, donor_name: org(l.donor_org_id).name })), error: null }; },
     is_admin() { return { data: prof() && prof().role === 'admin', error: null }; },
     create_request(a) {
       const o = myOrg(); if (!o || o.kind !== 'ngo' || o.verification !== 'approved' || o.suspended) return err('Only verified, active NGOs can request food');

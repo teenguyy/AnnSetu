@@ -261,7 +261,7 @@
 .impact h2 { color: var(--on-dark); margin-top: 1rem; }
 .impact h2 em { color: var(--sun); }
 .impact .lead { color: var(--muted-dark); }
-.imp-grid { margin: clamp(48px, 7vw, 96px) 0 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(20px, 3vw, 44px); }
+.imp-grid { margin: clamp(48px, 7vw, 96px) 0 0; padding-bottom: 56px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(20px, 3vw, 44px); }
 .imp { border-top: 1px solid rgba(168, 217, 233, .3); padding-top: 1.2rem; display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: .9rem; }
 .imp.skel { height: 180px; border: 0; opacity: .2; }
 .imp.i1, .imp.i3 { transform: translateY(56px); }
@@ -374,7 +374,7 @@
 @media (max-width: 860px) { .story, .mission, .journey, .discover, .exp, .impact, .stories, .join, .foot { border-radius: 32px 32px 0 0; margin-top: -32px; } .exp-p.donor { border-radius: 32px 32px 0 0; } .exp-p.ngo { border-radius: 0; } }
 
 /* ===================== Weekly snapshot, public leaderboard, about the app ===================== */
-.imp-week { margin: 2rem 0 0; padding: .9rem 1.2rem; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); color: var(--on-dark); font-size: .95rem; display: inline-flex; flex-wrap: wrap; gap: .2rem .4rem; align-items: baseline; }
+.imp-week { margin: 2.6rem 0 0; padding: .9rem 1.2rem; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); color: var(--on-dark); font-size: .95rem; display: inline-flex; flex-wrap: wrap; gap: .2rem .4rem; align-items: baseline; }
 .imp-week b { color: var(--sun); }
 .imp-week small { color: var(--muted-dark); }
 
@@ -431,3 +431,9 @@
 .imp-empty b { font-family: var(--f-display); font-weight: 300; -webkit-text-stroke: 1.5px var(--sun); }
 .fact-n b { color: #F4ECD8; font-weight: 300; }
 .imp dt small { font-style: italic; }
+
+@media (max-width: 900px) { .imp-grid { padding-bottom: 28px; } }
+.tray-link { cursor: pointer; transition: transform .3s var(--ease), box-shadow .3s var(--ease); }
+.tray-link:hover { transform: translateY(-3px); box-shadow: 0 18px 40px -20px rgba(16,47,70,.6); }
+.tray-cta { display: inline-flex; margin-top: .8rem; padding: .55rem 1rem; border-radius: 999px; background: var(--sun); color: var(--ink); font: 700 .9rem var(--f-grot); text-decoration: none; }
+.tray-cta:hover { background: var(--butter); }

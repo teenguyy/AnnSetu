@@ -110,15 +110,17 @@ function FoodCard({ l, i, inTray, canRequest, onAdd, onPointerDown, lifting, lay
 }
 
 /* ---------- request tray (drop target + accessible form) ---------- */
-function Tray({ trayRef, items, setItems, reps, rep, setRep, ok, lockReason, hot, dragging, onSubmit, onClear, results }) {
+function Tray({ trayRef, items, setItems, reps, rep, setRep, ok, lockReason, lockHref, hot, dragging, onSubmit, onClear, results }) {
   const update = (id, qty) => setItems((xs) => xs.map((x) => (x.l.id === id ? { ...x, qty } : x)));
   const remove = (id) => setItems((xs) => xs.filter((x) => x.l.id !== id));
   return (
-    <aside ref={trayRef} data-dark className={'tray' + (hot ? ' hot' : '') + (dragging ? ' armed' : '') + (!ok ? ' locked' : '')} aria-label="Request tray" aria-live="polite">
+    <aside ref={trayRef} data-dark className={'tray' + (hot ? ' hot' : '') + (dragging ? ' armed' : '') + (!ok ? ' locked' : '') + (!ok && lockHref ? ' tray-link' : '')} aria-label="Request tray" aria-live="polite"
+      {...(!ok && lockHref ? { onClick: () => { location.href = lockHref; }, 'data-cursor': 'hover' } : {})}>
       <div className="tray-h">
         <span className="kick">Request tray</span>
         <h3>{items.length ? `${items.length} listing${items.length > 1 ? 's' : ''} ready` : 'Drop food here'}</h3>
         <p className="m">{ok ? 'Drag a card here, or use “Add to request”. Nothing is sent until you confirm.' : lockReason}</p>
+        {!ok && lockHref && <a className="tray-cta" href={lockHref} onClick={(e) => e.stopPropagation()}>Sign up as a receiver →</a>}
       </div>
       <svg className="tray-target" viewBox="0 0 120 60" aria-hidden="true">
         <path d="M6 54 Q60 -6 114 54" pathLength="1" /><circle cx="6" cy="54" r="4" /><circle cx="114" cy="54" r="4" />
@@ -157,7 +159,7 @@ function Tray({ trayRef, items, setItems, reps, rep, setRep, ok, lockReason, hot
 }
 
 /* ---------- the board ---------- */
-export function DiscoverBoard({ listings, error, reps = [], ok, lockReason, onRequested, controls, intro }) {
+export function DiscoverBoard({ listings, error, reps = [], ok, lockReason, lockHref, onRequested, controls, intro }) {
   const toast = useToast();
   const reduce = useReducedMotion();
   const [q, setQ] = useState('');
@@ -251,7 +253,7 @@ export function DiscoverBoard({ listings, error, reps = [], ok, lockReason, onRe
                   </motion.div>
                 )}
         </div>
-        <Tray trayRef={trayRef} items={items} setItems={setItems} reps={reps} rep={rep} setRep={setRep} ok={!!ok} lockReason={lockReason}
+        <Tray trayRef={trayRef} items={items} setItems={setItems} reps={reps} rep={rep} setRep={setRep} ok={!!ok} lockReason={lockReason} lockHref={lockHref}
           hot={hot} dragging={!!drag} onSubmit={submit} onClear={() => { setItems([]); setResults({}); }} results={results} />
       </div>
       {drag && (
