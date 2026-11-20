@@ -64,8 +64,6 @@ class _GoogleButton extends StatelessWidget {
         child: Column(children: [
           BusyButton(outlined: true, icon: Icons.g_mobiledata_rounded, onPressed: () => AuthService.google(role: role), child: Text(label)),
           const SizedBox(height: 8),
-          BusyButton(outlined: true, icon: Icons.apple_rounded, onPressed: () => AuthService.oauth(OAuthProvider.apple, role: role), child: Text(label.replaceAll('Google', 'Apple'))),
-          const SizedBox(height: 8),
           BusyButton(outlined: true, icon: Icons.window_rounded, onPressed: () => AuthService.oauth(OAuthProvider.azure, role: role), child: Text(label.replaceAll('Google', 'Microsoft'))),
         ]),
       );
