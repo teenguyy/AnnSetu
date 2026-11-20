@@ -432,3 +432,16 @@ main#main { position: relative; isolation: isolate; }
 .otp-acts { margin-top: .8rem; }
 @media (prefers-reduced-motion: reduce) { .lt-steps li.now .lt-ic { animation: none; } }
 @media (max-width: 520px) { .lt-map { height: 230px; } .lt-contact .btn { flex: 1 1 auto; justify-content: center; } }
+/* OpenStreetMap markers */
+.lt-map { z-index: 0; }
+.lt-map .leaflet-control-attribution { font-size: 10px; }
+.lt-pin { background: none; border: 0; }
+.lt-pin span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid #102F46; font: 700 13px var(--f-grot); color: #102F46; box-shadow: 0 6px 14px -6px rgba(16,47,70,.6); }
+.lt-pin.d span { background: #FFE28A; }
+.lt-pin.n span { background: #82C5DF; }
+.lt-pin span { line-height: 1; }
+.lt-pin span b { transform: rotate(45deg); }
+.lt-rep { background: none; border: 0; }
+.lt-rep i { display: block; width: 22px; height: 22px; border-radius: 50%; background: #287FA6; border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(40,127,166,.25); animation: repPing 1.6s ease-out infinite; }
+@keyframes repPing { 0% { box-shadow: 0 0 0 0 rgba(40,127,166,.45); } 100% { box-shadow: 0 0 0 16px rgba(40,127,166,0); } }
+@media (prefers-reduced-motion: reduce) { .lt-rep i { animation: none; } }

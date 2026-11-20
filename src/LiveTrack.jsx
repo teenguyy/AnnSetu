@@ -1,9 +1,9 @@
-/* Delivery-app style pickup tracking: live map (Google Maps), route + ETA, confirmed steps, call / chat.
+/* Delivery-app style pickup tracking: live map (OpenStreetMap via Leaflet, no card or key), route + ETA, confirmed steps, call / chat.
    Used by the donor, the receiver (NGO) and the representative. */
 import React, { useEffect, useRef, useState } from 'react';
 import { FiPhone, FiMessageSquare, FiNavigation, FiMapPin, FiCheck, FiTruck, FiPackage, FiHome, FiUser } from 'react-icons/fi';
 import { db, ago } from './lib.js';
-import { loadGoogleMaps, hasPoint, pt, km } from './maps.js';
+import { loadLeaflet, hasPoint, pt, km, route, TILES, ATTRIBUTION } from './maps.js';
 import { Btn, useToast } from './ui.jsx';
 
 export const STEPS = [
@@ -59,66 +59,61 @@ function MapView({ rep, donor, ngo, target, onEta }) {
   const [err, setErr] = useState('');
   useEffect(() => {
     let dead = false;
-    loadGoogleMaps().then((maps) => {
+    loadLeaflet().then((L) => {
       if (dead || !box.current) return;
       const center = hasPoint(rep) ? pt(rep) : hasPoint(donor) ? pt(donor) : hasPoint(ngo) ? pt(ngo) : { lat: 20.59, lng: 78.96 };
-      const map = new maps.Map(box.current, { center, zoom: 14, disableDefaultUI: true, zoomControl: true, gestureHandling: 'cooperative', clickableIcons: false,
-        styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }] });
-      const pin = (fill, glyph) => ({ path: 'M12 0C5.4 0 0 5.2 0 11.6 0 20.3 12 32 12 32s12-11.7 12-20.4C24 5.2 18.6 0 12 0z', fillColor: fill, fillOpacity: 1, strokeColor: '#102F46', strokeWeight: 1.5, scale: 1.15, anchor: new maps.Point(12, 32), labelOrigin: new maps.Point(12, 12) });
+      const map = L.map(box.current, { center: [center.lat, center.lng], zoom: 14, scrollWheelZoom: false, attributionControl: true });
+      L.tileLayer(TILES, { maxZoom: 19, attribution: ATTRIBUTION }).addTo(map);
+      const pin = (cls, letter) => L.divIcon({ className: 'lt-pin ' + cls, html: '<span><b>' + letter + '</b></span>', iconSize: [30, 38], iconAnchor: [15, 38] });
       st.current = {
-        maps, map,
-        donor: hasPoint(donor) ? new maps.Marker({ map, position: pt(donor), icon: pin('#FFE28A'), label: { text: 'D', color: '#102F46', fontWeight: '700' }, title: 'Pickup: ' + (donor.name || 'donor') }) : null,
-        ngo: hasPoint(ngo) ? new maps.Marker({ map, position: pt(ngo), icon: pin('#82C5DF'), label: { text: 'N', color: '#102F46', fontWeight: '700' }, title: 'Drop: ' + (ngo.name || 'NGO') }) : null,
-        rep: new maps.Marker({ map, visible: false, zIndex: 9, title: 'Representative', icon: { path: maps.SymbolPath.CIRCLE, scale: 9, fillColor: '#287FA6', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3 } }),
-        line: new maps.Polyline({ map, strokeColor: '#164B70', strokeOpacity: 0.85, strokeWeight: 5 }),
-        dir: new maps.DirectionsService(), lastRoute: 0, lastFrom: null,
+        L, map,
+        donor: hasPoint(donor) ? L.marker([+donor.lat, +donor.lng], { icon: pin('d', 'D'), title: 'Pickup: ' + (donor.name || 'donor') }).addTo(map) : null,
+        ngo: hasPoint(ngo) ? L.marker([+ngo.lat, +ngo.lng], { icon: pin('n', 'N'), title: 'Drop: ' + (ngo.name || 'NGO') }).addTo(map) : null,
+        rep: null,
+        line: L.polyline([], { color: '#164B70', weight: 5, opacity: 0.85 }).addTo(map),
+        lastRoute: 0, lastFrom: null,
       };
       setErr('');
       update();
-    }).catch((e) => !dead && setErr(e.message));
-    return () => { dead = true; };
+      setTimeout(() => map.invalidateSize(), 200);
+    }).catch(() => !dead && setErr('The map could not load.'));
+    return () => { dead = true; if (st.current.map) { st.current.map.remove(); st.current = {}; } };
   }, []); // eslint-disable-line
 
   const update = () => {
     const s = st.current; if (!s.map) return;
+    const L = s.L;
     const dest = target === 'ngo' ? ngo : donor;
-    const bounds = new s.maps.LatLngBounds(); let n = 0;
-    [s.donor, s.ngo].forEach((m) => { if (m) { bounds.extend(m.getPosition()); n++; } });
+    const pts = [];
+    [s.donor, s.ngo].forEach((m) => { if (m) pts.push(m.getLatLng()); });
     if (hasPoint(rep)) {
-      const to = pt(rep), from = s.rep.getVisible() ? s.rep.getPosition() : null;
-      s.rep.setVisible(true);
-      if (from) { // glide smoothly to the new point
-        const t0 = performance.now(), a = { lat: from.lat(), lng: from.lng() };
-        const step = (t) => { const k = Math.min(1, (t - t0) / 900); s.rep.setPosition({ lat: a.lat + (to.lat - a.lat) * k, lng: a.lng + (to.lng - a.lng) * k }); if (k < 1) requestAnimationFrame(step); };
+      const to = pt(rep);
+      if (!s.rep) {
+        s.rep = L.marker([to.lat, to.lng], { icon: L.divIcon({ className: 'lt-rep', html: '<i></i>', iconSize: [22, 22], iconAnchor: [11, 11] }), zIndexOffset: 900, title: 'Representative' }).addTo(s.map);
+      } else { // glide smoothly to the new point
+        const a = s.rep.getLatLng(), t0 = performance.now();
+        const step = (t) => { const k = Math.min(1, (t - t0) / 900); s.rep.setLatLng([a.lat + (to.lat - a.lat) * k, a.lng + (to.lng - a.lng) * k]); if (k < 1) requestAnimationFrame(step); };
         requestAnimationFrame(step);
-      } else s.rep.setPosition(to);
-      bounds.extend(to); n++;
-      // route + live ETA (at most every 45 s, or after moving ~250 m)
+      }
+      pts.push(L.latLng(to.lat, to.lng));
+      // road route + live ETA (at most every 45 s, or after moving ~250 m)
       if (hasPoint(dest)) {
         const moved = s.lastFrom ? km(s.lastFrom, to) : 99;
         if (Date.now() - s.lastRoute > 45000 || moved > 0.25) {
           s.lastRoute = Date.now(); s.lastFrom = to;
-          s.dir.route({ origin: to, destination: pt(dest), travelMode: s.maps.TravelMode.DRIVING }, (res, status) => {
-            if (status === 'OK' && res.routes[0]) {
-              s.line.setPath(res.routes[0].overview_path);
-              const leg = res.routes[0].legs[0];
-              if (onEta) onEta({ mins: Math.max(1, Math.round(leg.duration.value / 60)), km: leg.distance.value / 1000 });
-            } else {
-              s.line.setPath([to, pt(dest)]);
-              if (onEta) { const d = km(to, pt(dest)); onEta({ mins: Math.max(1, Math.round((d / 22) * 60)), km: d, rough: true }); }
-            }
-          });
+          route(to, pt(dest)).then((r) => { if (st.current.map) { s.line.setLatLngs(r.path); if (onEta) onEta(r); } });
         }
       }
     }
-    if (n > 1) s.map.fitBounds(bounds, 48); else if (n === 1) s.map.setCenter(bounds.getCenter());
+    if (pts.length > 1) s.map.fitBounds(L.latLngBounds(pts), { padding: [36, 36], maxZoom: 16 });
+    else if (pts.length === 1) s.map.setView(pts[0], 15);
   };
   useEffect(update, [rep && rep.lat, rep && rep.lng, target]); // eslint-disable-line
 
   return (
     <div className="lt-map-wrap">
       <div ref={box} className="lt-map" role="img" aria-label="Live map of the pickup" />
-      {err && <div className="lt-map-off"><FiMapPin /><span>{err} {hasPoint(rep) ? <a href={`https://www.google.com/maps/search/?api=1&query=${rep.lat},${rep.lng}`} target="_blank" rel="noopener noreferrer">Open live location in Google Maps</a> : null}</span></div>}
+      {err && <div className="lt-map-off"><FiMapPin /><span>{err} {hasPoint(rep) ? <a href={`https://www.google.com/maps/search/?api=1&query=${rep.lat},${rep.lng}`} target="_blank" rel="noopener noreferrer">Open live location</a> : null}</span></div>}
     </div>
   );
 }

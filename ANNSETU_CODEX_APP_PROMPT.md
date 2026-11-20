@@ -15,7 +15,7 @@ AnnSetu connects surplus food from **donors** (restaurants, hotels, canteens, ca
 ## 1. Stack (fixed)
 - **Expo (latest SDK) + React Native + TypeScript (strict)**, Expo Router, EAS Build.
 - `@supabase/supabase-js` v2 with `expo-secure-store` for the session; `react-native-url-polyfill`.
-- **Google Maps**: `react-native-maps` with `PROVIDER_GOOGLE`. The Android Maps key goes in `app.config.ts` from an EAS secret (`GOOGLE_MAPS_ANDROID_KEY`), never in source.
+- **Maps (free, no card, no key)**: `@maplibre/maplibre-react-native` (or `react-native-maps` with an OpenStreetMap `UrlTile`) showing OpenStreetMap tiles with the required "© OpenStreetMap contributors" attribution. Routing + ETA: OSRM `https://router.project-osrm.org/route/v1/driving/{lng},{lat};{lng},{lat}?overview=full&geometries=geojson`. Reverse geocoding: Nominatim `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=..&lon=..` (send a descriptive User-Agent, max 1 request/second). Keep these URLs in one config file so they can be swapped for a self-hosted or free-tier provider later. Do NOT use Google Maps APIs (they need a billing card).
 - Location: `expo-location` (foreground + background with `expo-task-manager` during an active trip only).
 - Push: `expo-notifications` (see §9).
 - Images/files: `expo-image-picker`, `expo-document-picker`.
@@ -63,7 +63,7 @@ Admin: `review_document(p_doc, p_status, p_note)`, `review_org(p_org, p_approve,
 - `POST /chat` `{ messages: [{role, content}] }` → `{ reply }` (works signed-out too)
 - `POST /ai/auto-review` `{ document_id }`: call right after a document upload (fire and forget)
 - `POST /ai/review-document` `{ document_id }` (admin) and `POST /ai/review-no-cert` `{ org_id }` (admin)
-- `GET /config` → `{ maps_key, ai }` (website use; the app uses its own Android Maps key)
+- `GET /config` → `{ ai }` (website use)
 
 ## 6. Screens and features (nothing may be dropped)
 **Everyone**
@@ -81,14 +81,14 @@ Admin: `review_document(p_doc, p_status, p_note)`, `review_org(p_org, p_approve,
 
 **Receiver (NGO)**: discover nearby food (`nearby_listings`, list + map), request with a chosen representative; my requests (cancel); **Pickups** with the OTP to show and live tracking; **Representatives list** (name, phone, email, linked status, pickups done; add/remove); needs/requirements; impact.
 
-**Representative**: My pickups (`rep_my_pickups`): donor name, address, phone, food details, photo, pickup-by countdown, **OTP**, **Directions** (open Google Maps navigation intent to the donor, then to the NGO after collection); step buttons **Start trip → I’ve reached the donor → (donor confirms OTP = collected) → Delivered to NGO**; call donor, call NGO, message; history.
+**Representative**: My pickups (`rep_my_pickups`): donor name, address, phone, food details, photo, pickup-by countdown, **OTP**, **Directions** (open the phone's maps app with a `geo:` / `google.navigation:` intent, which is free, to the donor, then to the NGO after collection); step buttons **Start trip → I’ve reached the donor → (donor confirms OTP = collected) → Delivered to NGO**; call donor, call NGO, message; history.
 
 **Admin**: verification queue (no-certificate requests first, with due date = 5 business days), each document shows the **AI verdict chip** (AI verified / check manually / AI flagged) from `document_reviews`, an **AI overview** sheet (summary, extracted fields, checks with official links, genuineness), **Verify manually** / **Reject** buttons; organisations (approve, reject with note, suspend; after a rejection hide approve/reject and show "Reconsider"); listings; requests; reports (start review, warn, resolve, resolve + suspend, dismiss); leaderboard curation (pin/hide/clear with reason, top-% setting, refresh landing numbers); audit log showing **which admin** did what.
 
 ## 7. Live tracking (delivery-app style)
 - Steps with times: Pickup confirmed → On the way → Reached donor → Food collected (set automatically by `confirm_pickup`) → Delivered.
 - Representative: when they tap **Start trip**, start foreground + background location (expo-location + task manager, Android foreground-service notification "Sharing your location with the donor and NGO"); send `update_location` at most every 4 s; continue after collection (second leg to the NGO); stop on **Delivered** or cancel. Ask permissions only at Start trip, with a clear reason.
-- Donor and NGO: Google map with donor pin (D), NGO pin (N), representative marker gliding smoothly to each new point (subscribe to `rep_locations` realtime + poll every 8 s as fallback), route polyline and live ETA from the Google Directions API (rate-limited: every 45 s or after 250 m), "Live · updated Xs ago", buttons **Call representative / Call donor / Call NGO** (`tel:`) and **Message**.
+- Donor and NGO: OpenStreetMap map with donor pin (D), NGO pin (N), representative marker gliding smoothly to each new point (subscribe to `rep_locations` realtime + poll every 8 s as fallback), route polyline and live ETA from OSRM (rate-limited: every 45 s or after 250 m; fall back to straight line at ~22 km/h), "Live · updated Xs ago", buttons **Call representative / Call donor / Call NGO** (`tel:`) and **Message**.
 
 ## 8. Design system (match the website)
 - Palette "Ocean & Sunshine": Deep Ocean `#164B70`, Ocean `#287FA6`, Sky `#82C5DF`, Light Blue `#A8D9E9`, Sunshine `#FFE28A`, Butter `#F5D98B`, Deep Ink `#102F46`, Coral `#E87968`. No green, no gold.
@@ -108,5 +108,5 @@ Create `sql/annsetu_schema_part10_device_tokens.sql`: table `device_tokens(user_
 
 ## 11. Deliverables
 1. The Expo app in `mobile/` on the new branch, building without errors.
-2. `mobile/README.md`: setup, env/secrets (`GOOGLE_MAPS_ANDROID_KEY` via EAS secrets), running, testing, building the APK/AAB.
+2. `mobile/README.md`: setup, config, running, testing, building the APK/AAB.
 3. A short report: what works, what was tested, and anything still blocked (e.g. OAuth providers not enabled in Supabase).

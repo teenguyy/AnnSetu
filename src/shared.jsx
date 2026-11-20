@@ -193,10 +193,10 @@ export function ProfileView({ role, user, org, docs, onChanged, extra }) {
       (p) => {
         const lat = p.coords.latitude, lng = p.coords.longitude;
         setPos({ lat: lat.toFixed(6), lng: lng.toFixed(6) });
-        // Google Maps fills in the address too (if the Maps key is configured and the field is empty)
+        // OpenStreetMap (Nominatim) fills in the address too, if the field is empty
         addressFor(lat, lng).then((addr) => {
           const el = document.querySelector('input[name=address]');
-          if (addr && el && !el.value.trim()) { el.value = addr.slice(0, 160); toast('Location and address filled from Google Maps. Save to keep them.', 'info'); }
+          if (addr && el && !el.value.trim()) { el.value = addr.slice(0, 160); toast('Location and address filled in. Check them and save.', 'info'); }
         }).catch(() => {});
         toast('Location captured. Save to keep it.', 'info'); res();
       },
