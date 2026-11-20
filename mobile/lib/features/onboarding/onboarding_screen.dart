@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/routing/app_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/brand.dart';
+import '../../shared/widgets/hands_art.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -54,7 +55,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       backgroundColor: Brand.dark,
       body: Stack(
         children: [
-          const Positioned.fill(child: CustomPaint(painter: _WavesPainter())),
+          const Positioned.fill(
+            child: CustomPaint(painter: OceanWavesPainter()),
+          ),
           SafeArea(
             child: Column(
               children: [
@@ -140,70 +143,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 }
 
-/// Layered ocean curves, like the website hero.
-class _WavesPainter extends CustomPainter {
-  const _WavesPainter();
-  @override
-  void paint(Canvas c, Size s) {
-    void wave(double top, Color color, double amp) {
-      final path = Path()..moveTo(0, s.height * top);
-      path.cubicTo(
-        s.width * .3,
-        s.height * top - amp,
-        s.width * .6,
-        s.height * top + amp,
-        s.width,
-        s.height * top - amp * .4,
-      );
-      path
-        ..lineTo(s.width, s.height)
-        ..lineTo(0, s.height)
-        ..close();
-      c.drawPath(path, Paint()..color = color);
-    }
-
-    c.drawCircle(
-      Offset(s.width * .92, s.height * .08),
-      s.width * .45,
-      Paint()..color = Brand.forest.withValues(alpha: .55),
-    );
-    wave(.62, Brand.forest.withValues(alpha: .55), 40);
-    wave(.74, Brand.sage.withValues(alpha: .22), 30);
-    wave(.86, Brand.forest.withValues(alpha: .7), 24);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-/// The website's signature: a giving hand and a receiving hand meeting.
-class _Hands extends StatelessWidget {
-  const _Hands();
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 150,
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Image.asset(
-            'assets/brand/hand-giver.webp',
-            fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => const SizedBox(),
-          ),
-        ),
-        Expanded(
-          child: Image.asset(
-            'assets/brand/hand-receiver.webp',
-            fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => const SizedBox(),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 class _PageView extends StatelessWidget {
   final _Page p;
   final int index;
@@ -216,7 +155,7 @@ class _PageView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (index == 0)
-          const _Hands()
+          const HandsArt(height: 250)
         else
           Stack(
             clipBehavior: Clip.none,

@@ -11,6 +11,7 @@ import 'core/services/session.dart';
 import 'core/services/supabase_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
+import 'shared/widgets/hands_art.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,6 +65,7 @@ class AnnSetuApp extends StatelessWidget {
           darkTheme: AppTheme.dark(),
           themeMode: mode,
           routerConfig: appRouter,
+          builder: (_, child) => SplashGate(child: child ?? const SizedBox()),
         ),
       );
 }
