@@ -2,7 +2,7 @@
 (function () {
   const K = '__mockdb', SK = '__mocksess';
   const uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 3) | 8).toString(16); });
-  const T = ['profiles','organizations','representatives','food_listings','food_requests','pickup_otps','requirements','notifications','messages','reports','badge_definitions','org_badges','certificates','verification_documents','contact_messages','faqs','testimonials','audit_log','rep_locations','users','document_reviews','leaderboard_overrides','app_settings','landing_snapshots'];
+  const T = ['profiles','organizations','representatives','food_listings','food_requests','pickup_otps','requirements','notifications','messages','reports','badge_definitions','org_badges','certificates','verification_documents','contact_messages','faqs','testimonials','audit_log','rep_locations','users','document_reviews','leaderboard_overrides','app_settings','landing_snapshots','conversations','conversation_messages'];
   let db = JSON.parse(localStorage.getItem(K) || 'null');
   if (!db) {
     db = {}; T.forEach((t) => (db[t] = []));
@@ -94,8 +94,15 @@
       if (!l || l.status !== 'active' || new Date(l.pickup_by) <= new Date()) return err('This listing is no longer available');
       if (a.p_qty < 1 || a.p_qty > l.quantity - l.qty_reserved) return err('Quantity exceeds what is available');
       if (db.food_requests.find((r) => r.listing_id === l.id && r.ngo_org_id === o.id && r.status === 'pending')) return err('duplicate key value violates unique constraint');
+      if (l.reserved_for && l.reserved_for !== o.id) return err('This food is reserved for another organisation');
       const r = { id: uuid(), listing_id: l.id, ngo_org_id: o.id, rep_id: rep.id, rep_name: rep.name, rep_phone: rep.phone, quantity: a.p_qty, status: 'pending', created_at: now() };
-      db.food_requests.push(r); notify(l.donor_org_id, 'New food request', a.p_qty + ' ' + l.unit + ' of ' + l.title); return { data: r.id, error: null };
+      db.food_requests.push(r);
+      if (l.reserved_for === o.id) { // pledged food: accepted automatically
+        l.qty_reserved += a.p_qty; if (l.qty_reserved === l.quantity) l.status = 'reserved'; r.status = 'accepted';
+        db.pickup_otps.push({ request_id: r.id, ngo_org_id: o.id, otp: String(Math.floor(1000 + Math.random() * 9000)), expires_at: l.pickup_by });
+        notify(l.donor_org_id, 'Pickup arranged', rep.name + ' will collect ' + l.title); return { data: r.id, error: null };
+      }
+      notify(l.donor_org_id, 'New food request', a.p_qty + ' ' + l.unit + ' of ' + l.title); return { data: r.id, error: null };
     },
     respond_request(a) {
       const r = db.food_requests.find((x) => x.id === a.p_request), l = db.food_listings.find((x) => x.id === r.listing_id);
@@ -132,7 +139,32 @@
     admin_withdraw_listing(a) { db.food_listings.find((l) => l.id === a.p_listing).status = 'withdrawn'; return { data: null, error: null }; },
     resolve_report(a) { const r = db.reports.find((x) => x.id === a.p_report); r.status = a.p_status; r.admin_note = a.p_note; return { data: null, error: null }; },
     update_location(a) { db.rep_locations = db.rep_locations.filter((x) => x.request_id !== a.p_request); db.rep_locations.push({ request_id: a.p_request, lat: a.p_lat, lng: a.p_lng, updated_at: now() }); return { data: null, error: null }; },
-    nearby_listings() { return { data: db.food_listings.filter((l) => l.status === 'active').map((l) => ({ ...l, donor_name: org(l.donor_org_id).name, distance_km: 2.4 })), error: null }; },
+    _conv(donor, ngo) { let c = db.conversations.find((x) => x.donor_org_id === donor && x.ngo_org_id === ngo); if (!c) { c = { id: uuid(), donor_org_id: donor, ngo_org_id: ngo, created_at: now(), last_message_at: now() }; db.conversations.push(c); } return c; },
+    _msg(c, body) { const m = { id: uuid(), conversation_id: c.id, sender_id: uid(), body, created_at: now() }; db.conversation_messages.push(m); c.last_message_at = m.created_at; const to = org(c.donor_org_id).owner_id === uid() ? c.ngo_org_id : c.donor_org_id; notify(to, 'Message from ' + myOrg().name, body.slice(0, 80)); return m; },
+    fulfil_need(a) {
+      const o = myOrg(); if (!o || o.kind !== 'donor' || o.verification !== 'approved') return err('Only verified, active donors can fulfil needs');
+      const n = db.requirements.find((x) => x.id === a.p_need); if (!n) return err('Need not found'); if (n.status !== 'open') return err('Another donor has already pledged this need');
+      if (!(a.p_quantity >= 1)) return err('Enter a quantity');
+      const l = { id: uuid(), donor_org_id: o.id, title: n.title, category: a.p_category, quantity: a.p_quantity, unit: a.p_unit, qty_reserved: 0, status: 'active', prepared_at: now(), pickup_by: a.p_pickup_by, safety_notes: a.p_notes, photo_path: a.p_photo, reserved_for: n.ngo_org_id, need_id: n.id, created_at: now() };
+      db.food_listings.push(l); n.status = 'pledged'; n.pledged_by = o.id;
+      rpcs._msg(rpcs._conv(o.id, n.ngo_org_id), a.p_message || ('We will fulfil your need: ' + a.p_quantity + ' ' + a.p_unit + ' of ' + n.title + '.'));
+      notify(n.ngo_org_id, 'Your need is being fulfilled', o.name + ' pledged ' + n.title); return { data: l.id, error: null };
+    },
+    open_conversation(a) {
+      const o = myOrg(), x = org(a.p_other); if (!o || o.verification !== 'approved') return err('Your organisation must be verified first');
+      if (!x || x.verification !== 'approved') return err('This organisation is not available'); if (o.kind === x.kind) return err('Messages are between a donor and a receiver');
+      const donor = o.kind === 'donor' ? o.id : x.id, ngo = o.kind === 'ngo' ? o.id : x.id;
+      return { data: rpcs._conv(donor, ngo).id, error: null };
+    },
+    my_conversations() {
+      const o = myOrg(); if (!o) return { data: [], error: null };
+      return { data: db.conversations.filter((c) => [c.donor_org_id, c.ngo_org_id].includes(o.id)).map((c) => {
+        const other = org(c.donor_org_id === o.id ? c.ngo_org_id : c.donor_org_id); const ms = db.conversation_messages.filter((m) => m.conversation_id === c.id); const last = ms[ms.length - 1];
+        return { id: c.id, other_org_id: other.id, other_name: other.name, other_phone: other.phone, last_body: last ? last.body : null, last_sender: last ? last.sender_id : null, last_at: c.last_message_at };
+      }).sort((a, b) => (a.last_at < b.last_at ? 1 : -1)), error: null };
+    },
+    message_partners() { return { data: [], error: null }; },
+    nearby_listings() { return { data: db.food_listings.filter((l) => l.status === 'active' && (!l.reserved_for || l.reserved_for === (myOrg() || {}).id)).map((l) => ({ ...l, donor_name: org(l.donor_org_id).name, distance_km: 2.4 })), error: null }; },
     get_leaderboard() { return { data: [], error: null }; },
     public_impact() { const d = db.food_requests.filter((r) => r.status === 'completed'); const ok = (k) => db.organizations.filter((o) => o.kind === k && o.verification === 'approved' && !o.suspended).length; return { data: [{ donations: d.length, units: d.reduce((x, r) => x + r.quantity, 0), donors: ok('donor'), ngos: ok('ngo') }], error: null }; },
     verify_certificate(a) { const c = db.certificates.find((x) => x.serial === String(a.p_serial || '').trim().toUpperCase()); return { data: c ? [{ org_name: org(c.org_id).name, title: c.title, issued_at: c.issued_at }] : [], error: null }; },
@@ -156,6 +188,7 @@
         if (t === 'food_listings') arr.forEach((l) => Object.assign(l, { qty_reserved: 0, status: 'active' }));
         if (t === 'verification_documents') arr.forEach((d) => Object.assign(d, { status: 'pending' }));
         if (t === 'messages') arr.forEach((m) => { m.sender_id = uid(); m.thread = m.thread || 'donor_ngo'; });
+        if (t === 'conversation_messages') arr.forEach((m) => { m.sender_id = uid(); const c = db.conversations.find((x) => x.id === m.conversation_id); if (c) c.last_message_at = now(); });
         if (t === 'requirements') arr.forEach((n) => (n.status = 'open'));
         if (t === 'reports') arr.forEach((r) => (r.status = 'open'));
         if (t === 'contact_messages') arr.forEach((c) => (c.status = 'new'));

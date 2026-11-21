@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FiHome, FiSearch, FiInbox, FiMapPin, FiPlusCircle, FiAward, FiUser, FiMessageSquare, FiFlag, FiX, FiNavigation, FiPackage, FiCheckCircle, FiTrash2, FiUsers, FiClock, FiTarget } from 'react-icons/fi';
+import { FiHome, FiSearch, FiInbox, FiMapPin, FiPlusCircle, FiAward, FiUser, FiMessageSquare, FiFlag, FiX, FiNavigation, FiPackage, FiCheckCircle, FiTrash2, FiUsers, FiClock, FiTarget, FiMessageCircle } from 'react-icons/fi';
 import { db, CATEGORIES, toLocalInput, fmtDT, tleft } from './lib.js';
-import { need, loadReceiver, loadDiscover, subscribe, markAllRead } from './data.js';
+import { need, loadReceiver, loadDiscover, subscribe, markAllRead, openConversation } from './data.js';
+import { MessagesView } from './messages.jsx';
 import { Shell, PageHead, Hero } from './shell.jsx';
 import { Btn, AsyncForm, Field, Card, Tag, Empty, Bar, Stat, Skeleton, useToast, useLoader, useHashTab } from './ui.jsx';
 import { DiscoverBoard } from './discover.jsx';
 import { VerifyBanner, canAct, profileComplete, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity, mapsLink } from './shared.jsx';
 import { LiveTrack } from './LiveTrack.jsx';
 
-const TABS = ['overview', 'discover', 'requests', 'pickups', 'needs', 'impact', 'profile'];
+const TABS = ['overview', 'discover', 'requests', 'pickups', 'needs', 'messages', 'impact', 'profile'];
 
 export default function Receiver({ me }) {
   const uid = me.user.id;
@@ -17,6 +18,7 @@ export default function Receiver({ me }) {
   const { data, error, refresh, setData } = useLoader(() => loadReceiver(uid), [uid]);
   const [chat, setChat] = useState(null);
   const [report, setReport] = useState(null);
+  const [convOpen, setConvOpen] = useState(null);
   useEffect(() => subscribe(uid, refresh), [uid]); // eslint-disable-line
 
   if (error) return <div className="fatal"><h1>Couldn’t load your dashboard</h1><p>{error.message}</p><button className="btn primary" onClick={refresh}>Try again</button></div>;
@@ -35,6 +37,7 @@ export default function Receiver({ me }) {
     { id: 'requests', label: 'Requests', icon: <FiInbox />, badge: pending.length || null },
     { id: 'pickups', label: 'Pickups', icon: <FiMapPin />, badge: accepted.length || null },
     { id: 'needs', label: 'Needs', icon: <FiPlusCircle /> },
+    { id: 'messages', label: 'Messages', icon: <FiMessageCircle /> },
     { id: 'impact', label: 'Impact', icon: <FiAward /> },
     { id: 'profile', label: 'Profile', icon: <FiUser /> },
   ];
@@ -123,8 +126,11 @@ export default function Receiver({ me }) {
     </Card>
     {needs.length ? needs.map((n, i) => (
       <Card key={n.id} i={i}>
-        <div className="row"><div><h3>{n.title}</h3><span className="m">{n.quantity} needed by {fmtDT(n.needed_by)}</span></div><Tag s={n.status} /></div>
+        <div className="row"><div><h3>{n.title}</h3><span className="m">{n.quantity} needed by {fmtDT(n.needed_by)}</span></div><Tag s={n.status === 'pledged' ? 'accepted' : n.status}>{n.status}</Tag></div>
+        {n.status === 'pledged' && <p className="note"><b>{n.pledger}</b> pledged food for this need, only for you. Choose a representative in Discover. The pickup is confirmed automatically.</p>}
         <div className="acts">
+          {n.status === 'pledged' && <Btn size="sm" onClick={() => setTab('discover')}>Collect it</Btn>}
+          {n.pledged_by && <Btn size="sm" kind="ghost" onClick={async () => { try { setConvOpen(await openConversation(n.pledged_by)); setTab('messages'); } catch (e) { toast(e.message, 'bad'); } }}>Message {n.pledger}</Btn>}
           {n.status === 'open' && <Btn size="sm" kind="ghost" onClick={async () => { need(await db.from('requirements').update({ status: 'fulfilled' }).eq('id', n.id)); await refresh(); }}>Mark fulfilled</Btn>}
           <Btn size="sm" kind="danger" onClick={async () => { need(await db.from('requirements').delete().eq('id', n.id)); await refresh(); }}><FiTrash2 /> Delete</Btn>
         </div>
@@ -170,6 +176,7 @@ export default function Receiver({ me }) {
         {view === 'requests' && requestsView}
         {view === 'pickups' && pickupsView}
         {view === 'needs' && needsView}
+        {view === 'messages' && <MessagesView meId={uid} kind="ngo" openId={convOpen} onOpened={() => setConvOpen(null)} />}
         {view === 'impact' && org && <ImpactView org={org} kind="ngo" stats={stats} />}
         {view === 'profile' && <><PageHead kicker="Organisation" title="Profile" sub="Your organisation, representatives and documents." /><ProfileView role="ngo" user={me.user} org={org} docs={docs} onChanged={async () => { if (!org) setTab('profile'); await refresh(); }} extra={org ? repsCard : null} /></>}
       </>}
@@ -183,7 +190,7 @@ export default function Receiver({ me }) {
 function Discover({ org, reps, ok, onRequested, setTab }) {
   const toast = useToast();
   const [pos, setPos] = useState(org && org.lat != null && org.lng != null ? { lat: Number(org.lat), lng: Number(org.lng) } : null);
-  const [radius, setRadius] = useState(15);
+  const [radius, setRadius] = useState(50);
   const { data, error, refresh } = useLoader(() => loadDiscover({ lat: pos?.lat, lng: pos?.lng, radius, category: '' }), [pos?.lat, pos?.lng, radius]);
   const locate = () => new Promise((res) => {
     if (!navigator.geolocation) { toast('Your browser can’t share location.', 'bad'); return res(); }
@@ -193,12 +200,12 @@ function Discover({ org, reps, ok, onRequested, setTab }) {
   const controls = (
     <div className="geo-f">
       <Btn size="sm" kind="ghost" onClick={locate}><FiNavigation /> {pos ? 'Update location' : 'Use my location'}</Btn>
-      {pos && <select className="mini" value={radius} onChange={(e) => setRadius(+e.target.value)} aria-label="Search radius">{[5, 15, 30, 50].map((r) => <option key={r} value={r}>{r} km</option>)}</select>}
+      {pos && <select className="mini" value={radius} onChange={(e) => setRadius(+e.target.value)} aria-label="Search radius">{[5, 15, 30, 50, 100, 0].map((r) => <option key={r} value={r}>{r ? r + ' km' : 'Any distance'}</option>)}</select>}
       {pos && <Btn size="sm" kind="ghost" onClick={() => setPos(null)}>Clear location</Btn>}
     </div>
   );
   return (<>
-    <PageHead kicker="Food discovery" title="Discover food" sub={pos ? `Fresh listings within ${radius} km, nearest first.` : 'Fresh listings from verified donors. Share your location to sort by distance.'} />
+    <PageHead kicker="Food discovery" title="Discover food" sub={pos ? (radius ? `Fresh listings within ${radius} km, nearest first.` : 'Fresh listings at any distance, nearest first.') : 'Fresh listings from verified donors. Share your location to sort by distance.'} />
     {!reps.length && ok && <div className="banner warn rise"><FiUsers /><div><b>Add a pickup representative first</b><span>You choose who collects each pickup.</span></div><Btn size="sm" kind="ghost" onClick={() => setTab('profile')}>Add</Btn></div>}
     <DiscoverBoard listings={data} error={error} reps={reps} ok={ok}
       lockReason="Your organisation must be verified and active before you can request food."

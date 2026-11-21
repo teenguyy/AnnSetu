@@ -50,7 +50,8 @@ export async function loadDonor(uid) {
   listings.forEach((l) => { l.photo = publicUrl('listing-photos', l.photo_path); });
   const ids = listings.map((l) => l.id);
   const reqs = ids.length ? need(await db.from('food_requests').select('*').in('listing_id', ids).order('created_at', { ascending: false })) || [] : [];
-  const names = await orgMap(reqs.map((r) => r.ngo_org_id));
+  const names = await orgMap([...reqs.map((r) => r.ngo_org_id), ...listings.map((l) => l.reserved_for).filter(Boolean)]);
+  listings.forEach((l) => { if (l.reserved_for) l.pledged_to = (names[l.reserved_for] || {}).name || 'a receiver'; });
   const byId = Object.fromEntries(listings.map((l) => [l.id, l]));
   reqs.forEach((r) => { r.listing = byId[r.listing_id]; r.ngo = names[r.ngo_org_id] || { name: 'Receiver' }; });
   const acc = reqs.filter((r) => r.status === 'accepted').map((r) => r.id);
@@ -74,14 +75,24 @@ export async function loadReceiver(uid) {
   const accIds = reqs.filter((r) => r.status === 'accepted').map((r) => r.id);
   const otpRows = accIds.length ? need(await db.from('pickup_otps').select('request_id,otp,expires_at').in('request_id', accIds)) || [] : [];
   const needs = need(await db.from('requirements').select('*').eq('ngo_org_id', org.id).order('created_at', { ascending: false })) || [];
+  const pledgers = await orgMap(needs.map((n) => n.pledged_by).filter(Boolean));
+  needs.forEach((n) => { if (n.pledged_by) n.pledger = (pledgers[n.pledged_by] || {}).name || 'A donor'; });
   return { ...base, reps, requests: reqs, needs, docs: await orgDocs(org.id), otps: Object.fromEntries(otpRows.map((o) => [o.request_id, o])) };
 }
 
+export const ANY_DISTANCE_KM = 20000;
 export async function loadDiscover({ lat, lng, radius, category }) {
   let rows;
+  let wider = false;
   if (lat != null && lng != null) {
-    rows = need(await db.rpc('nearby_listings', { p_lat: lat, p_lng: lng, p_radius_km: radius, p_category: category || null })) || [];
-    rows = rows.map((r) => ({ ...r, donor_org_id: r.donor_org_id, distance: r.distance_km }));
+    const near = async (km) => need(await db.rpc('nearby_listings', { p_lat: lat, p_lng: lng, p_radius_km: km, p_category: category || null })) || [];
+    rows = await near(radius || ANY_DISTANCE_KM);
+    // Nothing (besides food reserved for us) within the chosen distance: show the nearest food farther away.
+    if (radius && radius < ANY_DISTANCE_KM && !rows.some((r) => !r.reserved_for)) {
+      const far = (await near(ANY_DISTANCE_KM)).filter((r) => !r.reserved_for);
+      if (far.length) { rows = [...rows, ...far]; wider = true; }
+    }
+    rows = rows.map((r) => ({ ...r, distance: r.distance_km }));
   } else {
     let q = db.from('food_listings').select('*').eq('status', 'active').gt('pickup_by', new Date().toISOString()).order('pickup_by', { ascending: true }).limit(100);
     if (category) q = q.eq('category', category);
@@ -89,7 +100,25 @@ export async function loadDiscover({ lat, lng, radius, category }) {
     const names = await orgMap(rows.map((l) => l.donor_org_id));
     rows = rows.map((l) => ({ ...l, donor_name: (names[l.donor_org_id] || {}).name || 'Donor', donor_address: (names[l.donor_org_id] || {}).address || null, distance: null }));
   }
-  return rows.map((l) => ({ ...l, photo: publicUrl('listing-photos', l.photo_path) }));
+  const out = rows.map((l) => ({ ...l, photo: publicUrl('listing-photos', l.photo_path) }))
+    .sort((a, b) => (b.reserved_for ? 1 : 0) - (a.reserved_for ? 1 : 0));
+  out.wider = wider;
+  return out;
+}
+
+/* ---------- donor <-> receiver conversations (part 13) ---------- */
+export async function loadConversations() {
+  const [convs, partners] = await Promise.all([db.rpc('my_conversations'), db.rpc('message_partners')]);
+  return { convs: need(convs) || [], partners: need(partners) || [] };
+}
+export async function openConversation(otherOrgId) {
+  return need(await db.rpc('open_conversation', { p_other: otherOrgId }));
+}
+export async function loadConversationMessages(convId) {
+  return need(await db.from('conversation_messages').select('id,sender_id,body,created_at').eq('conversation_id', convId).order('created_at', { ascending: true }).limit(500)) || [];
+}
+export async function sendConversationMessage(convId, body) {
+  need(await db.from('conversation_messages').insert({ conversation_id: convId, body }));
 }
 
 /* ---------- impact, badges, certificates ---------- */

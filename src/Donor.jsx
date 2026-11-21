@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FiHome, FiList, FiInbox, FiMapPin, FiAward, FiUser, FiPlus, FiMessageSquare, FiFlag, FiCheck, FiX, FiBox, FiClock, FiHeart, FiNavigation, FiTrendingUp } from 'react-icons/fi';
+import { FiHome, FiList, FiInbox, FiMapPin, FiAward, FiUser, FiPlus, FiMessageSquare, FiMessageCircle, FiFlag, FiCheck, FiX, FiBox, FiClock, FiHeart, FiNavigation, FiTrendingUp } from 'react-icons/fi';
 import { db, CATEGORIES, uploadTo, toLocalInput, fmtDT, tleft, ago } from './lib.js';
-import { need, loadDonor, subscribe, markAllRead } from './data.js';
+import { need, loadDonor, subscribe, markAllRead, openConversation } from './data.js';
+import { MessagesView, FulfilNeedModal } from './messages.jsx';
 import { Shell, PageHead, Hero } from './shell.jsx';
 import { Btn, AsyncForm, Field, Card, Tag, Empty, Bar, Stat, Skeleton, useToast, useLoader, useHashTab, confetti } from './ui.jsx';
 import { VerifyBanner, canAct, profileComplete, ChatModal, ReportModal, ImpactView, ProfileView, Checklist, Activity, NeedsList } from './shared.jsx';
 import { LiveTrack } from './LiveTrack.jsx';
 
-const TABS = ['overview', 'listings', 'needs', 'requests', 'pickups', 'impact', 'profile'];
+const TABS = ['overview', 'listings', 'needs', 'messages', 'requests', 'pickups', 'impact', 'profile'];
 const lstatus = (l) => (l.status === 'active' && new Date(l.pickup_by) < new Date() ? 'expired' : l.status);
 
 export default function Donor({ me }) {
@@ -19,6 +20,9 @@ export default function Donor({ me }) {
   const [report, setReport] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [prefill, setPrefill] = useState(null);
+  const [fulfil, setFulfil] = useState(null);
+  const [convOpen, setConvOpen] = useState(null);
+  const [needsKey, setNeedsKey] = useState(0);
   const [flt, setFlt] = useState('all');
   useEffect(() => subscribe(uid, refresh), [uid]); // eslint-disable-line
 
@@ -41,6 +45,7 @@ export default function Donor({ me }) {
     { id: 'overview', label: 'Overview', icon: <FiHome /> },
     { id: 'listings', label: 'Listings', icon: <FiList /> },
     { id: 'needs', label: 'Community needs', icon: <FiHeart /> },
+    { id: 'messages', label: 'Messages', icon: <FiMessageCircle /> },
     { id: 'requests', label: 'Requests', icon: <FiInbox />, badge: pending.length || null },
     { id: 'pickups', label: 'Pickups', icon: <FiMapPin />, badge: accepted.length || null },
     { id: 'impact', label: 'Impact', icon: <FiAward /> },
@@ -146,7 +151,7 @@ export default function Donor({ me }) {
           <Card key={l.id} i={i} className="lcard">
             {l.photo ? <img className="lph" src={l.photo} alt="" loading="lazy" /> : null}
             <div className="lbody">
-              <div className="row"><div><h3>{l.title}</h3><span className="m">{l.category} · pickup by {fmtDT(l.pickup_by)}</span></div><Tag s={s} /></div>
+              <div className="row"><div><h3>{l.title}</h3><span className="m">{l.category} · pickup by {fmtDT(l.pickup_by)}</span>{l.pledged_to && <span className="reserved-tag inline">Pledged to {l.pledged_to} · private</span>}</div><Tag s={s} /></div>
               <div className="m" style={{ marginTop: 8 }}>{l.quantity - l.qty_reserved} of {l.quantity} {l.unit} available{s === 'active' ? ' · ' + tleft(l.pickup_by) : ''}{l.safety_notes ? ' · ' + l.safety_notes : ''}</div>
               <Bar pct={(l.qty_reserved / l.quantity) * 100} />
               {s === 'active' && l.qty_reserved === 0 && <div style={{ marginTop: 12 }}><Btn kind="danger" size="sm" onClick={withdraw(l)} title={hasPending ? 'Pending requests will no longer be acceptable' : ''}>Withdraw listing</Btn></div>}
@@ -189,9 +194,13 @@ export default function Donor({ me }) {
         {view === 'requests' && requestsView}
         {view === 'pickups' && pickupsView}
         {view === 'impact' && org && <ImpactView org={org} kind="donor" stats={stats} />}
-        {view === 'needs' && (<><PageHead kicker="Community" title="Community needs" sub="What verified receivers have asked for. List matching food and they can request it." />
+        {view === 'needs' && (<><PageHead kicker="Community" title="Community needs" sub="What verified receivers have asked for. Fulfil a need privately, or message the receiver." />
           {!ok ? <Empty>Needs are visible once your organisation is verified.</Empty>
-            : <NeedsList onHelp={(n) => { setPrefill({ id: n.id, title: n.title, qty: n.quantity, ngo: n.ngo?.name || 'a receiver' }); setShowForm(true); setTab('listings'); }} emptyText="No open needs right now. Check back soon." />}</>)}
+            : <NeedsList reloadKey={needsKey} onHelp={(n) => setFulfil(n)}
+                onMessage={async (n) => { try { setConvOpen(await openConversation(n.ngo_org_id)); setTab('messages'); } catch (e) { toast(e.message, 'bad'); } }}
+                emptyText="No open needs right now. Check back soon." />}</>)}
+        {view === 'messages' && <MessagesView meId={uid} kind="donor" openId={convOpen} onOpened={() => setConvOpen(null)} />}
+        {fulfil && <FulfilNeedModal need={fulfil} uid={uid} onClose={() => setFulfil(null)} onDone={async () => { setFulfil(null); setNeedsKey((k) => k + 1); await refresh(); }} />}
         {view === 'profile' && <><PageHead kicker="Organisation" title="Profile" sub="Your organisation, verification and documents." /><ProfileView role="donor" user={me.user} org={org} docs={docs} onChanged={async () => { if (!org) setTab('profile'); await refresh(); }} /></>}
       </>}
             {chat && <ChatModal request={chat} meId={uid} side="donor" names={{ ngo: chat.ngo.name, rep: chat.rep_name ? chat.rep_name + ' (representative)' : 'Representative' }} onClose={() => setChat(null)} />}

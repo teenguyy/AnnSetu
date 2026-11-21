@@ -84,6 +84,7 @@ function FoodCard({ l, i, inTray, canRequest, onAdd, onPointerDown, lifting, lay
         {l.photo ? <img src={l.photo} alt={`Photo of ${l.title}`} loading="lazy" decoding="async" />
           : <div className="food-ph" aria-hidden="true"><span>{CAT_MARK[l.category] || 'AS'}</span><small>{l.category}</small></div>}
         <span className={'avail ' + av.key}><i />{av.label}</span>
+        {l.reserved_for && <span className="reserved-tag">Reserved for you</span>}
         {dragOk && <span className="grip" title="Drag into your request tray" aria-hidden="true"><FiMove /></span>}
       </div>
       <div className="food-b">
@@ -183,7 +184,8 @@ export function DiscoverBoard({ listings, error, reps = [], ok, lockReason, lock
       nearest: (a, b) => (a.distance ?? 1e9) - (b.distance ?? 1e9),
       newest: (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
     }[sort];
-    return by ? xs.slice().sort(by) : xs;
+    const mine = (l) => (l.reserved_for ? 0 : 1); // food pledged to us always comes first
+    return xs.slice().sort((a, b) => mine(a) - mine(b) || (by ? by(a, b) : 0));
   }, [listings, q, cat, sort]);
 
   const inTray = (id) => items.some((x) => x.l.id === id);
@@ -240,6 +242,7 @@ export function DiscoverBoard({ listings, error, reps = [], ok, lockReason, lock
       <div className="board-grid">
         <div className="board-main">
           <p className="board-count m" aria-live="polite">{listings ? `${shown.length} of ${listings.length} listings` : ''}</p>
+          {listings?.wider && <div className="banner info rise"><FiMapPin /><div><b>Nothing within your search distance</b><span>Showing the nearest food farther away. Check the distance on each card before sending a representative.</span></div></div>}
           {error ? <Empty title="Couldn’t load listings">{errMsg(error)}</Empty>
             : !listings ? <Skeleton />
               : !shown.length ? <Empty title={listings.length ? 'No matches' : 'No food available right now'}>{listings.length ? 'Try another search or category.' : 'New listings appear here the moment verified donors publish them.'}</Empty>

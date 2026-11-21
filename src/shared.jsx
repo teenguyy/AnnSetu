@@ -500,8 +500,8 @@ export async function loadNeeds(all = false) {
   const byId = Object.fromEntries(orgs.map((o) => [o.id, o]));
   return rows.map((r) => ({ ...r, ngo: byId[r.ngo_org_id] || null }));
 }
-export function NeedsList({ admin, onHelp, emptyText }) {
-  const { data, error } = useLoader(() => loadNeeds(admin), [admin]);
+export function NeedsList({ admin, onHelp, onMessage, emptyText, reloadKey }) {
+  const { data, error } = useLoader(() => loadNeeds(admin), [admin, reloadKey]);
   if (error) return <Empty>Couldn’t load needs: {error.message}</Empty>;
   if (!data) return <Skeleton />;
   if (!data.length) return <Empty>{emptyText || 'No open needs right now.'}</Empty>;
@@ -512,9 +512,10 @@ export function NeedsList({ admin, onHelp, emptyText }) {
         <div className="row"><div><h3>{n.title}</h3>
           <span className="m">{n.quantity} needed by {fmtDT(n.needed_by)} · {n.ngo ? n.ngo.name : 'Receiver'}{n.ngo?.area_served ? ' · serves ' + n.ngo.area_served : ''}</span></div>
           <Tag s={n.status === 'open' ? (late ? 'rejected' : 'pending') : 'approved'}>{n.status === 'open' ? (late ? 'overdue' : 'open') : n.status}</Tag></div>
-        {(onHelp || n.ngo?.phone) && (
+        {(onHelp || onMessage || n.ngo?.phone) && (
           <div className="acts">
-            {onHelp && n.status === 'open' && <Btn size="sm" onClick={() => onHelp(n)}>List food for this need</Btn>}
+            {onHelp && n.status === 'open' && <Btn size="sm" onClick={() => onHelp(n)}>Fulfil this need</Btn>}
+            {onMessage && <Btn size="sm" kind="ghost" onClick={() => onMessage(n)}>Message {n.ngo?.name || 'receiver'}</Btn>}
             {n.ngo?.phone && <a className="btn ghost sm" href={'tel:' + String(n.ngo.phone).replace(/[^+\d]/g, '')}>Call {n.ngo.name}</a>}
           </div>
         )}
